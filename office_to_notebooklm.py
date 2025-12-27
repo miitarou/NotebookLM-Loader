@@ -20,6 +20,12 @@ COMBINED_FILENAME = "All_Files_Combined.txt"
 # 判定閾値（目安）
 TEXT_PER_VISUAL_THRESHOLD = 300 
 
+TEXT_EXTENSIONS = {
+    '.txt', '.md', '.py', '.js', '.jsx', '.ts', '.tsx', '.html', '.css', '.json', 
+    '.yaml', '.yml', '.org', '.sh', '.bat', '.zsh', '.rb', '.java', '.c', '.cpp', 
+    '.h', '.go', '.rs', '.php', '.pl', '.swift', '.kt', '.sql', '.xml', '.csv'
+}
+
 def setup_args():
     parser = argparse.ArgumentParser(description='Office files to Markdown converter for NotebookLM')
     parser.add_argument('target_dir', help='Target directory containing Office files or ZIP file')
@@ -105,7 +111,7 @@ def sanitize_filename(name):
     """ファイル名として使える文字だけに置換"""
     return re.sub(r'[\\/*?:"<>|]', "", name)
 
-def get_output_filename(root_path, file_path):
+def get_output_filename(root_path, file_path, extension=".md"):
     """
     元のフォルダ構造を反映したファイル名を生成する。
     例: root/A/B/file.docx -> A_B_file.md
@@ -114,10 +120,10 @@ def get_output_filename(root_path, file_path):
         rel_path = file_path.relative_to(root_path)
         # フォルダ区切りをアンダースコア等に置換してフラット化
         flat_name = str(rel_path.with_suffix('')).replace(os.sep, '_')
-        return sanitize_filename(flat_name) + ".md"
+        return sanitize_filename(flat_name) + extension
     except ValueError:
         # root_path外にある場合（稀だが一応）
-        return file_path.stem + ".md"
+        return file_path.stem + extension
 
 
 def extract_zip_with_encoding(zip_path, extract_to):
@@ -202,43 +208,78 @@ def process_directory(current_path, root_path, output_dir, args, report_items, c
 
             vis_count = 0
             char_count = 0
-            
-            # 1. 解析
+            markdown_content = ""
+            is_copy_optimization = False
+
+            # --- File Type Handling ---
+
+            # 1. Office Files
             if ext == '.docx':
                 print(f"Processing: {file}")
                 vis_count, char_count = analyze_docx(file_path)
+                markdown_content = convert_with_markitdown(file_path)
+            
             elif ext == '.xlsx':
                 print(f"Processing: {file}")
                 vis_count, char_count = analyze_xlsx(file_path)
+                markdown_content = convert_with_markitdown(file_path)
+
             elif ext == '.pptx':
                 if args.skip_ppt:
                     print(f"Skipping PPT: {file}")
                     continue
                 print(f"Processing: {file}")
                 vis_count, char_count = analyze_pptx(file_path)
+                markdown_content = convert_with_markitdown(file_path)
+
+            # 2. PDF Files (Direct Copy with Renaming)
+            elif ext == '.pdf':
+                print(f"Copying PDF: {file}")
+                output_filename = get_output_filename(root_path, file_path, extension=".pdf")
+                output_path = output_dir / output_filename
+                try:
+                    shutil.copy2(file_path, output_path)
+                except Exception as e:
+                    print(f"Error copying PDF {file}: {e}")
+                continue # PDF processing ends here (no markdown wrap)
+
+            # 3. Text Files (Read and Wrap)
+            elif ext in TEXT_EXTENSIONS:
+                print(f"Processing Text: {file}")
+                try:
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        markdown_content = f.read()
+                        markdown_content = f"```\n{markdown_content}\n```" # Wrap in code block for clarity? Or just raw? User said "add metadata header".
+                        # Let's keep it raw text but with Markdown header, so it behaves like a document. 
+                        # If it's code, MarkItDown usually wraps in blocks, but here we are raw reading. 
+                        # Let's just output raw content.
+                except Exception as e:
+                    print(f"Error reading text file {file}: {e}")
+                    markdown_content = ""
+            
             else:
                 continue 
 
-            # 2. レポートデータ
+            # --- Post-Processing (Report & Write) ---
+
+            # Report Logic (Office only mostly, but logic is generic based on counts)
             if vis_count > 0:
                 ratio = char_count / vis_count if vis_count > 0 else 9999
                 is_dense_visual = ratio < TEXT_PER_VISUAL_THRESHOLD
                 if is_dense_visual or vis_count >= 5:
                     report_items.append((file, vis_count, char_count, ratio))
 
-            # 3. 変換 (MarkItDown Engine)
-            markdown_content = convert_with_markitdown(file_path)
-            
+            # Write Output
             if markdown_content:
                 # 構造を維持したファイル名を生成
-                output_filename = get_output_filename(root_path, file_path)
+                output_filename = get_output_filename(root_path, file_path, extension=".md")
                 output_path = output_dir / output_filename
                 
                 # 相対パス（コンテキスト用）
                 try:
                     rel_path_str = str(file_path.relative_to(root_path))
                 except:
-                    rel_path_str = file.name
+                    rel_path_str = file if isinstance(file, str) else file.name
 
                 # メタデータヘッダーの作成
                 metadata_header = f"""# File Info

@@ -24,6 +24,12 @@ Microsoft公式の `markitdown` ライブラリをエンジンとして採用し
 - **解析フェーズ (Architect)**: 画像数カウント等は自作ロジック。
 - **変換フェーズ (Builder)**: テキスト化はMarkItDown。
 
+### 3. その他ファイルのパススルー & コンテキスト化 (New)
+- **目的**: 変換対象外のファイル（PDF, ソースコード, テキストメモ等）も、`converted_files` に集約し、NotebookLMに一括アップロードできるようにする。
+- **戦略**:
+    - **PDFなどのバイナリ**: 単純コピーだが、ファイル名にパスを含める (`Folder_Sub_file.pdf`) ことでコンテキストを保持。
+    - **テキストファイル (.txt, .md, .py, etc)**: 内容を読み込み、Markdownヘッダ（Original Path等）を付与して `.md` として保存する。これによりNotebookLMが文脈を理解しやすくなる。
+
 ## 手順
 1. 再帰処理時の `relative_path` を取得するようにロジック修正。
 2. 出力ファイル名生成ロジックを `path_to_filename` のような関数に変更。
