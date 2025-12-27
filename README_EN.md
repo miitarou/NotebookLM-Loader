@@ -4,9 +4,8 @@
 
 
 This is a Python tool designed to convert Microsoft Office files (Word, Excel, PowerPoint) into a Markdown format optimized for **Google NotebookLM**.
-
-It utilizes **Microsoft's official `MarkItDown`** conversion engine for high-fidelity text extraction, effectively handling tables and lists.
-Crucially, it features "Smart Chunking" and "Auto-Switch to PDF" to handle real-world document sets that contain both text-heavy and visual-heavy files.
+It aims to **structure unstructured data** (tables, lists, headings) within documents to maximize the accuracy of RAG (Retrieval-Augmented Generation).
+It utilizes **Microsoft's official `MarkItDown`** conversion engine for high-fidelity text extraction.
 
 ## Key Features
 
@@ -17,7 +16,7 @@ Crucially, it features "Smart Chunking" and "Auto-Switch to PDF" to handle real-
 
 2.  **Auto-Switch to PDF (High Density Visuals)**:
     *   If a file (like a PowerPoint slide deck) is determined to be "High Visual Density" (many images, little text), the tool **automatically converts it to PDF** using LibreOffice (instead of Markdown).
-    *   This ensures NotebookLM can "see" the charts and diagrams, rather than just receiving meaningless text fragments.
+    *   This eliminates the manual effort of converting files to PDF specifically for NotebookLM registration.
 
 3.  **All-in-One Loader**:
     *   Recursively scans folders and **ZIP files**.
@@ -66,9 +65,16 @@ The output in `converted_files_merged` will contain:
 
 ### Options
 
-- `--merge`: (Recommended) Enables Smart Chunking and Auto-Switch to PDF. Generates `converted_files_merged` folder.
-- `--skip-ppt`: Skips PowerPoint files entirely.
+- `--merge`: **(Recommended: Smart Mode)**
+    - In addition to standard 1-to-1 conversion (`converted_files`), generating a **`converted_files_merged` folder**.
+    - This folder contains optimized "Volume" files (under 200k chars) and auto-converted PDFs. Use this folder for uploading to NotebookLM.
+- `--skip-ppt`:
+    - **Excludes** PowerPoint (.pptx) files from the dataset entirely.
+    - These files will not be converted to Markdown nor PDF. Use this only if you intentionally want to ignore PowerPoint files.
 
-## License
+## Visual Density Report
+
+The report displayed after execution shows whether each file was processed as "Text (Markdown)" or "Visual (PDF)".
+Files marked as "High Visual Density" are **automatically exported as PDF**, so no further action is required. simply upload them to NotebookLM.
 
 MIT

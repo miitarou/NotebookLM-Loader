@@ -3,9 +3,8 @@
 [ [English](README_EN.md) | [日本語](README.md) | **中文** ]
 
 这是一个 Python 工具，旨在将 Microsoft Office 文件（Word、Excel、PowerPoint）转换为针对 **Google NotebookLM** 优化的 Markdown 格式。
-
-它采用 **Microsoft 官方的 `MarkItDown`** 转换引擎，实现高保真的文本提取，有效处理表格和列表。
-关键在于，它具备 “智能分块 (Smart Chunking)” 和 “自动转换为 PDF (Auto-Switch to PDF)” 功能，能够处理包含大量文本和视觉内容的现实文档集。
+其目的是对文档中的非结构化数据（表格、列表、标题）进行**明确的结构化 (Structuring)**，从而最大化 RAG（检索增强生成）的准确性。
+它采用 **Microsoft 官方的 `MarkItDown`** 转换引擎，实现高保真的文本提取。
 
 ## 主要功能
 
@@ -16,7 +15,7 @@
 
 2.  **自动转换为 PDF (Auto-Switch to PDF - High Density Visuals)**:
     *   如果文件（如 PowerPoint 演示文稿）被判定为 “高视觉密度 (High Visual Density)”（图片多，文本少），该工具会使用 LibreOffice **自动将其转换为 PDF**（而不是 Markdown）。
-    *   这确保 NotebookLM 能够 “看到” 图表和图解，而不仅仅是接收无意义的文本片段。
+    *   这消除了专门为 NotebookLM 注册而手动将文件转换为 PDF 的工作。
 
 3.  **多合一加载器 (All-in-One Loader)**:
     *   递归扫描文件夹和 **ZIP 文件**。
@@ -65,9 +64,16 @@ python office_to_notebooklm.py /path/to/archive.zip --merge
 
 ### 选项
 
-- `--merge`: （推荐）启用智能分块和自动 PDF 转换。生成 `converted_files_merged` 文件夹。
-- `--skip-ppt`: 完全跳过 PowerPoint 文件。
+- `--merge`: **（推荐：智能模式）**
+    - 除了普通模式（`converted_files` 中的一对一输出）外，还会生成 **`converted_files_merged` 文件夹**。
+    - 该文件夹包含针对 Token 限制（200k 字符）优化的合并文件和自动转换的 PDF 文件。上传到 NotebookLM 时请使用此文件夹。
+- `--skip-ppt`:
+    - 将 PowerPoint (.pptx) 文件**从数据集中完全排除**。
+    - 指定此选项后，将不会执行 Markdown 转换或 PDF 转换。仅在您有意忽略 PowerPoint 文件时使用此选项。
 
-## 许可证
+## 视觉密度报告 (Visual Density Report)
+
+执行后显示的报告会指出每个文件是作为 “文本 (Markdown)” 还是 “视觉 (PDF)” 处理的。
+标记为 “High Visual Density” 的文件**已自动导出为 PDF**，因此无需用户进行额外操作。直接上传到 NotebookLM 即可。
 
 MIT
