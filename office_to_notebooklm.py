@@ -29,7 +29,7 @@ TEXT_EXTENSIONS = {
 def setup_args():
     parser = argparse.ArgumentParser(description='Office files to Markdown converter for NotebookLM')
     parser.add_argument('target_dir', help='Target directory containing Office files or ZIP file')
-    parser.add_argument('--combine', action='store_true', help='Combine all converted files into one single text file')
+    parser.add_argument('--merge', action='store_true', help='Also create merged output in converted_files_merged directory')
     parser.add_argument('--skip-ppt', action='store_true', help='Skip PowerPoint files (recommend using PDF for visual-heavy PPTs)')
     return parser.parse_args()
 
@@ -182,6 +182,7 @@ class MergedOutputManager:
         content_len = len(content)
 
         # Case 1: Huge single file -> Recursive Split
+        # (ヘッダ込みで計算済みだが、念のためここでもチェックする論理は変えないが、handle_huge_file内で厳密計算する)
         if content_len > MAX_CHARS_PER_VOLUME:
             self._handle_huge_file(filename, content)
             return
@@ -197,34 +198,50 @@ class MergedOutputManager:
 
     def _handle_huge_file(self, filename, content):
         """巨大ファイルを分割して登録する"""
-        parts = []
+        # content は既にヘッダーがついている状態だが、
+        # ここでは再分割するため、ヘッダーを除去して本文だけ取り出したいところだが、
+        # 引数の content は 'final_content' であり、メタデータを含んでいる。
+        # 厳密にはメタデータごと分割するのは変なので、
+        # 本文だけ抽出するよりは、渡される前の raw content を引数に取るべきだが、
+        # 設計上、Markdown変換後の最終テキストを受け取っているので、
+        # ここでは「巨大なテキスト塊」として扱い、強制分割する方針とする。
+        
         remaining = content
         part_num = 1
         
         while remaining:
-            # 切り出しサイズ（余裕を見て少し小さめに）
-            chunk_size = MAX_CHARS_PER_VOLUME - 500
-            if len(remaining) > chunk_size:
-                # 改行などで区切りたいが、簡易実装として文字数でバッサリいく
-                # (MarkItDownの結果ならMarkdown構造があるが、安全側に倒す)
-                c_chunk = remaining[:chunk_size]
-                remaining = remaining[chunk_size:]
+            # 次のパート用ヘッダー（概算サイズ）
+            part_header = f"\n\n# {filename} (Part {part_num})\n\n"
+            header_len = len(part_header)
+            
+            # 残りの容量
+            available_space = MAX_CHARS_PER_VOLUME - header_len
+            
+            # 現在のバッファに空きがなければフラッシュ
+            if self.current_char_count + header_len > MAX_CHARS_PER_VOLUME: # ヘッダすら入らないならフラッシュ
+                 self._flush_volume()
+            
+            # 再計算（フラッシュ後）
+            available_space = MAX_CHARS_PER_VOLUME - self.current_char_count - header_len
+            
+            if len(remaining) > available_space:
+                # カット
+                c_chunk = remaining[:available_space]
+                remaining = remaining[available_space:]
             else:
                 c_chunk = remaining
                 remaining = ""
             
-            header = f"\n\n# {filename} (Part {part_num})\n\n"
-            full_chunk = header + c_chunk
+            full_chunk = part_header + c_chunk
             
-            # Flush current buffer if needed (unlikely to fit if we are splitting huge file)
-            if self.current_char_count > 0:
-                 self._flush_volume()
-            
-            # Add chunk to buffer and flush immediately (since it's huge)
+            # ここまできたら必ず入るはず
             self.current_content.append(full_chunk)
             self.file_index.append(f"{filename} (Part {part_num})")
             self.current_char_count += len(full_chunk)
-            self._flush_volume()
+            
+            # 満杯になったらフラッシュ
+            if self.current_char_count >= MAX_CHARS_PER_VOLUME:
+                self._flush_volume()
             
             part_num += 1
 
@@ -233,26 +250,27 @@ class MergedOutputManager:
         if not self.current_content:
             return
 
-        vol_filename = f"Merged_Files_Vol{self.current_vol:02d}.md"
-        output_path = self.output_dir / vol_filename
-        
-        # 目次生成
-        index_text = "# Table of Contents\n" + "\n".join([f"- {name}" for name in self.file_index]) + "\n\n---\n\n"
-        
-        full_text = index_text + "\n".join(self.current_content)
-        
-        try:
-            with open(output_path, 'w', encoding='utf-8') as f:
-                f.write(full_text)
-            print(f"[Merged Created] {vol_filename} ({len(full_text)} chars)")
-        except Exception as e:
-            print(f"Error writing volume {vol_filename}: {e}")
+        if self.current_content: # Double check
+            vol_filename = f"Merged_Files_Vol{self.current_vol:02d}.md"
+            output_path = self.output_dir / vol_filename
+            
+            # 目次生成
+            index_text = "# Table of Contents\n" + "\n".join([f"- {name}" for name in self.file_index]) + "\n\n---\n\n"
+            
+            full_text = index_text + "\n".join(self.current_content)
+            
+            try:
+                with open(output_path, 'w', encoding='utf-8') as f:
+                    f.write(full_text)
+                print(f"[Merged Created] {vol_filename} ({len(full_text)} chars)")
+            except Exception as e:
+                print(f"Error writing volume {vol_filename}: {e}")
 
-        # Reset
-        self.current_vol += 1
-        self.current_content = []
-        self.current_char_count = 0
-        self.file_index = []
+            # Reset
+            self.current_vol += 1
+            self.current_content = []
+            self.current_char_count = 0
+            self.file_index = []
 
     def finalize(self):
         """最後に残っているバッファを書き出す"""
@@ -275,7 +293,7 @@ def is_text_file(file_path):
 def process_directory(current_path, root_path, output_dir, args, report_items, merger, processed_zips=None):
     """
     ディレクトリを再帰的に処理する関数
-    merger: MergedOutputManager instance
+    merger: MergedOutputManager instance (None if merge disabled)
     """
     if processed_zips is None:
         processed_zips = set()
@@ -321,8 +339,7 @@ def process_directory(current_path, root_path, output_dir, args, report_items, m
             vis_count = 0
             char_count = 0
             markdown_content = ""
-            current_output_filename_base = ""
-
+            
             # --- File Type Handling ---
 
             # 1. Office Files
@@ -348,19 +365,20 @@ def process_directory(current_path, root_path, output_dir, args, report_items, m
             elif ext == '.pdf':
                 print(f"Copying PDF: {file}")
                 output_filename = get_output_filename(root_path, file_path, extension=".pdf")
-                # PDFはMergeせず、Mergedフォルダに直接コピーする
+                
+                # Copy to Single folder
+                try:
+                    shutil.copy2(file_path, output_dir / output_filename)
+                except Exception:
+                    pass
+
+                # Copy to Merged folder (if enabled)
                 if merger:
                      try:
                         shutil.copy2(file_path, merger.output_dir / output_filename)
                      except Exception as e:
                         print(f"Error copying PDF to merged dir: {e}")
                 
-                # Single file output (optional, but keeping behavior consistent)
-                output_path = output_dir / output_filename
-                try:
-                    shutil.copy2(file_path, output_path)
-                except Exception:
-                    pass
                 continue 
 
             # 3. Universal Text Loader (Any text file)
@@ -377,14 +395,13 @@ def process_directory(current_path, root_path, output_dir, args, report_items, m
                     try:
                         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                             markdown_content = f.read()
-                            # 読みやすさのためCodeBlockで囲むかは任意だが、汎用テキストはそのままの方が検索しやすい場合も多い
-                            # ここでは MarkdownヘッダーをつけるのでそのままでOK
                             if not markdown_content.strip(): markdown_content = "(Empty File)"
                     except Exception as e:
                         print(f"Error reading text file {file}: {e}")
                         markdown_content = ""
                 else:
-                    # Binary or unknown
+                    # Binary or unknown -> Log and Skip
+                    print(f"[Skipped Binary] {file}")
                     continue
 
             # --- Post-Processing (Report & Write) ---
@@ -414,14 +431,14 @@ def process_directory(current_path, root_path, output_dir, args, report_items, m
 """
                 final_content = metadata_header + markdown_content + "\n\n---\n\n"
 
-                # 1. Write individual file (Legacy support)
+                # 1. Write individual file (Always)
                 try:
                     with open(output_path, 'w', encoding='utf-8') as f:
                         f.write(final_content)
                 except Exception as e:
                     print(f"Failed to write individual {output_path}: {e}")
                 
-                # 2. Add to Smart Merger
+                # 2. Add to Smart Merger (Only if enabled)
                 if merger:
                     merger.add_content(output_filename, final_content)
 
@@ -436,29 +453,40 @@ def main():
 
     if target_path.is_dir():
         output_dir = target_path / OUTPUT_DIR_NAME
-        merged_dir = target_path / (OUTPUT_DIR_NAME + "_merged")
         root_processing_path = target_path
     else:
         output_dir = target_path.parent / OUTPUT_DIR_NAME
-        merged_dir = target_path.parent / (OUTPUT_DIR_NAME + "_merged")
         root_processing_path = target_path.parent
         
     output_dir.mkdir(exist_ok=True)
-    # merged_dir is created by manager
 
-    print(f"\nTarget: {target_path}")
-    print(f"Output: {output_dir}")
-    print(f"Merged: {merged_dir}")
-    print("-" * 50)
+    # Merged Output Setup (Only if --merge is specified)
+    merger = None
+    if args.merge:
+        if target_path.is_dir():
+            merged_dir = target_path / (OUTPUT_DIR_NAME + "_merged")
+        else:
+            merged_dir = target_path.parent / (OUTPUT_DIR_NAME + "_merged")
+        
+        print(f"\nTarget: {target_path}")
+        print(f"Output: {output_dir}")
+        print(f"Merged: {merged_dir}")
+        print("-" * 50)
+        
+        merger = MergedOutputManager(merged_dir)
+    else:
+        print(f"\nTarget: {target_path}")
+        print(f"Output: {output_dir}")
+        print("(Use --merge to create combined output)")
+        print("-" * 50)
     
-    # Initialize Manager
-    merger = MergedOutputManager(merged_dir)
     report_items = [] 
     
     process_directory(target_path, root_processing_path, output_dir, args, report_items, merger)
     
     # Finalize Merge
-    merger.finalize()
+    if merger:
+        merger.finalize()
 
     print("\n" + "="*60)
     print(" COMPLETED")
@@ -473,6 +501,7 @@ def main():
              print(f" {fname:<40} | {v:>7} | {int(r):>5} ({rating})")
         print("-" * 70)
         print(" * 'High Density' (Text/Visual ratio < 300) -> Use PDF for better AI understanding.")
+
 
 
 if __name__ == "__main__":

@@ -21,9 +21,11 @@
 
 ## 進化フェーズ (Smart Merge & Universal)
 - [x] **Universal Text Loader**: 拡張子不問でテキスト判定し、読み込むロジックの実装
-- [x] **Smart Chunking**: 20万文字単位で結合ファイルを自動分割・生成する機能の実装
-- [x] **Recursive Split**: 巨大な単一ファイルをページング分割するロジックの実装
-- [x] **Merged Output**: `converted_files_merged` への出力と、目次生成機能の実装
+## 進化フェーズ (Smart Merge & Universal)
+- [x] **Universal Text Loader**: 拡張子不問でテキスト判定し、読み込むロジックの実装
+- [x] **Smart Chunking (Refined)**: ヘッダ込みの厳密な文字数計算と、バイナリSkipログの実装
+- [x] **Option Refactor**: `--combine` を廃止し `--merge` を追加（デフォルトはバラ出力のみ、指定時のみマージ生成）
+
 
 ## 検証・仕上げ
 - [x] サンプルファイルを用いた変換テスト (Zip/Folder)

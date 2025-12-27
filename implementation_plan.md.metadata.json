@@ -1,6 +1,6 @@
 {
   "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
-  "summary":  "Added plans for Smart Chunking and Universal Text Support.",
-  "updatedAt":  "2025-12-27T10:41:19.728532Z",
-  "version":  "6"
+  "summary":  "Refined split logic, logging, and argument specs.",
+  "updatedAt":  "2025-12-27T13:27:25.794460Z",
+  "version":  "7"
 }

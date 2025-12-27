@@ -1,6 +1,6 @@
 {
   "artifactType":  "ARTIFACT_TYPE_TASK",
-  "summary":  "Marked all Smart Merge tasks as complete.",
-  "updatedAt":  "2025-12-27T10:43:29.237886Z",
-  "version":  "17"
+  "summary":  "Marked refinement tasks as complete.",
+  "updatedAt":  "2025-12-27T13:33:53.116113Z",
+  "version":  "20"
 }
