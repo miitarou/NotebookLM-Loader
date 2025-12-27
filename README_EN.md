@@ -10,8 +10,9 @@ It utilizes **Microsoft's official `MarkItDown`** conversion engine for high-fid
 ## Key Features
 
 1.  **Smart Chunking (Merged Output)**:
-    *   Automatically merges converted text files into larger "Volume" files (approx. 200,000 chars each).
-    *   This drastically reduces the number of file uploads required for NotebookLM (e.g., turning 1,000 small docs into 5 large ones).
+    *   Automatically merges converted text files into larger **`Merged_Files_VolXX.md`** files (approx. 200,000 chars each).
+    *   These merged files, along with auto-converted PDFs, are output to the **`converted_files_merged` folder**.
+    *   Users just need to drag and drop the contents of this folder into NotebookLM.
     *   Recursive splitting ensures no single file exceeds the token limit.
 
 2.  **Auto-Switch to PDF (High Density Visuals)**:
@@ -75,6 +76,6 @@ The output in `converted_files_merged` will contain:
 ## Visual Density Report
 
 The report displayed after execution shows whether each file was processed as "Text (Markdown)" or "Visual (PDF)".
-Files marked as "High Visual Density" are **automatically exported as PDF**, so no further action is required. simply upload them to NotebookLM.
+Files marked as "High Visual Density" are **automatically exported as PDF**, so no further action is required. Simply upload them to NotebookLM.
 
 MIT

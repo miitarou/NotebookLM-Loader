@@ -7,10 +7,13 @@ Microsoft Officeファイル（Word, Excel, PowerPoint）を、NotebookLMでの�
 **Microsoft公式の変換エンジン `MarkItDown`** を採用し、高い変換精度を実現しています。また、独自の「視覚要素検知レポート」により、NotebookLMに登録するべきファイル形式（Markdown vs PDF）の判断を支援します。
 
 ## 主な機能
-## 主な機能
-1.  **Smart Chunking (自動分割結合)**: フォルダ内の大量のファイルを、NotebookLMが読みやすいサイズ（約20万文字）ごとに自動で結合・分割して `Merged_Files_VolXX.md` にまとめます。数千ファイルあってもドラッグ＆ドロップ数回で済みます。
+
+1.  **Smart Chunking (自動分割結合)**:
+    *   フォルダ内の大量のファイルを、NotebookLMが読みやすいサイズ（約20万文字）ごとに自動で結合・分割して **`Merged_Files_VolXX.md`** にまとめます。
+    *   これらの結合ファイルと、後述する自動変換PDFは **`converted_files_merged` フォルダ** に出力されます。
+    *   ユーザーはこのフォルダの中身をNotebookLMにドラッグ＆ドロップするだけで完了します。
 2.  **All-in-One Loader**: Officeファイル、PDF、ソースコード、テキストなど、フォルダ内のあらゆる可読データを自動検知して取り込みます。
-3.  **Auto-Switch to PDF (自動PDF化)**: 画像やグラフが多いファイル（High Density）を検知すると、**自動的にPDFに変換**して出力します（LibreOfficeを使用）。これにより、NotebookLMの手動PDF化作業すら不要になります。
+3.  **Auto-Switch to PDF (自動PDF化)**: 画像やグラフが多いファイル（High Density）を検知すると、**自動的にPDFに変換**して出力します（LibreOfficeを使用）。これにより、NotebookLMへ登録するために手動でPDF化する作業が不要になります。
 4.  **高精度Markdown変換**: Microsoft MarkItDownを使用し、リストや表などの構造を正確にテキスト化します。
 
 ## 必要要件
@@ -50,6 +53,6 @@ python office_to_notebooklm.py /target/dir --merge --skip-ppt
 
 ## 注意事項 - 変換の仕様について
 - **MarkItDown Engine:** Microsoft公式の強力なパーサーを使用するため、表やリストなどの構造認識精度が高いです。変換されたテキストは、NotebookLMが文脈を理解するのに最適です。
-- **視覚要素レポート (Visual Density):** 
-    - 実行後に表示されるレポートで「High Visual Density」と警告されたファイルは、Markdown変換では情報が欠落する可能性が高いです。
-    - **推奨:** これらのファイルはMarkdownを使わず、**PDF形式**でNotebookLMに直接アップロードしてください。
+- **視覚要素レポート (Visual Density):**
+    - 実行後に表示されるレポートです。各ファイルが「テキスト（Markdown）」として処理されたか、「画像主体（PDF）」として処理されたかを確認できます。
+    - 「High Visual Density」と判定されたファイルは、**自動でPDFに変換され出力されています**。ユーザーによる追加の手順は不要です。

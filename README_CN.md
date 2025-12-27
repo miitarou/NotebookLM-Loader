@@ -9,8 +9,9 @@
 ## 主要功能
 
 1.  **智能分块 (Smart Chunking - Merged Output)**:
-    *   自动将转换后的文本文件合并为较大的 “卷 (Volume)” 文件（每个约 200,000 字符）。
-    *   这大大减少了上传到 NotebookLM 所需的文件数量（例如，将 1,000 个小文档合并为 5 个大文件）。
+    *   自动将转换后的文本文件合并为较大的 **`Merged_Files_VolXX.md`** 文件（每个约 200,000 字符）。
+    *   这些合并文件以及自动转换的 PDF 都将输出到 **`converted_files_merged` 文件夹** 中。
+    *   用户只需将该文件夹的内容拖放到 NotebookLM 中即可。
     *   递归分割确保没有单个文件超过 Token 限制。
 
 2.  **自动转换为 PDF (Auto-Switch to PDF - High Density Visuals)**:
@@ -73,7 +74,7 @@ python office_to_notebooklm.py /path/to/archive.zip --merge
 
 ## 视觉密度报告 (Visual Density Report)
 
-执行后显示的报告会指出每个文件是作为 “文本 (Markdown)” 还是 “视觉 (PDF)” 处理的。
+执行后显示的报告是信息性的，指出每个文件是作为 “文本 (Markdown)” 还是 “视觉 (PDF)” 处理的。
 标记为 “High Visual Density” 的文件**已自动导出为 PDF**，因此无需用户进行额外操作。直接上传到 NotebookLM 即可。
 
 MIT
