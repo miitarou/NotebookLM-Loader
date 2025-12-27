@@ -29,9 +29,10 @@
 ## 环境要求
 
 - Python 3.10+
-- **LibreOffice** (用于将 PPTX/DOCX 转换为 PDF)
-    - Mac: 检查 `/Applications/LibreOffice.app`
-    - Linux: `soffice` 命令必须在 PATH 中
+- **LibreOffice** (自动 PDF 转换功能必须)
+    - 推荐 **7.0 或更高版本**
+    - Mac: 必须安装在 `/Applications/LibreOffice.app`
+    - Linux/Windows: `soffice` 命令必须在 PATH 中
 
 ## 安装
 

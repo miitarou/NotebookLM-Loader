@@ -30,9 +30,10 @@ It utilizes **Microsoft's official `MarkItDown`** conversion engine for high-fid
 ## Requirements
 
 - Python 3.10+
-- **LibreOffice** (Required for PDF conversion of PPTX/DOCX)
-    - Mac: `/Applications/LibreOffice.app` check
-    - Linux: `soffice` command must be in PATH
+- **LibreOffice** (Required for Auto-Switch PDF conversion)
+    - **Version 7.0 or later** recommended
+    - Mac: Must be installed at `/Applications/LibreOffice.app`
+    - Linux/Windows: `soffice` command must be in your PATH
 
 ## Installation
 

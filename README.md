@@ -17,7 +17,12 @@ Microsoft Officeファイル（Word, Excel, PowerPoint）を、NotebookLMでの�
 4.  **高精度Markdown変換**: Microsoft MarkItDownを使用し、リストや表などの構造を正確にテキスト化します。
 
 ## 必要要件
+## 必要要件
 - Python 3.10以上
+- **LibreOffice** (自動PDF化機能を利用する場合に必須)
+    - **バージョン 7.0 以上** 推奨（Headlessモードが安定しているため）
+    - Mac: `/Applications/LibreOffice.app` にインストールされていること
+    - Linux/Windows: `soffice` コマンドにパスが通っていること
 - 必要なライブラリ: `markitdown`, `python-docx`, `openpyxl`, `python-pptx`, `pandas`
   - `pip install -r requirements.txt` でインストール可能
 
