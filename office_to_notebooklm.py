@@ -12,6 +12,42 @@ import zipfile
 import shutil
 import tempfile
 import re
+import subprocess
+
+# ---------------------------------------------------------
+# PDF Conversion Utilities
+# ---------------------------------------------------------
+
+def convert_to_pdf_via_libreoffice(input_path, output_dir_path):
+    """
+    LibreOffice (soffice) を使用してPDF変換を行う。
+    Mac: /Applications/LibreOffice.app/Contents/MacOS/soffice
+    """
+    soffice_path = "/Applications/LibreOffice.app/Contents/MacOS/soffice"
+    if not os.path.exists(soffice_path):
+        soffice_path = "soffice" # Try PATH
+
+    cmd = [
+        soffice_path,
+        "--headless",
+        "--convert-to", "pdf",
+        "--outdir", str(output_dir_path),
+        str(input_path)
+    ]
+    try:
+        # Run command
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        
+        # Output filename check (LibreOffice creates filename.pdf)
+        original_stem = input_path.stem
+        
+        generated_pdf = output_dir_path / (original_stem + ".pdf")
+        if generated_pdf.exists():
+            return generated_pdf
+        return None
+    except Exception as e:
+        print(f"    [PDF Convert Error] {e}")
+        return None
 
 # 定数など
 OUTPUT_DIR_NAME = "converted_files"
@@ -368,24 +404,52 @@ def process_directory(current_path, root_path, output_dir, args, report_items, m
                 is_dense_visual = ratio < TEXT_PER_VISUAL_THRESHOLD
                 if is_dense_visual or vis_count >= 5:
                     is_high_density = True
-                    print(f"  [Auto-Switch] High density detected (Visuals: {vis_count}, Ratio: {int(ratio)}). Kept as original.")
-                    report_items.append((file, vis_count, char_count, ratio, "Kept Original"))
+                    print(f"  [Auto-Switch] High density detected (Visuals: {vis_count}). Converting to PDF...")
                     
-                    # Copy Original File Logic (Pass-through)
-                    output_filename = get_output_filename(root_path, file_path, extension=ext) # Use Original Ext
+                    # Target Filename (Flat)
+                    target_pdf_name = get_output_filename(root_path, file_path, extension=".pdf")
+                    final_pdf_path = output_dir / target_pdf_name
                     
-                    # Copy to Single folder
-                    try:
-                        shutil.copy2(file_path, output_dir / output_filename)
-                    except Exception:
-                        pass
+                    # Try PDF Conversion
+                    pdf_result = convert_to_pdf_via_libreoffice(file_path, output_dir) # Temp output to output_dir
+                    
+                    if pdf_result:
+                        # Rename/Move to correct flat filename
+                        # Since we outputted to output_dir, the file is likely there as 'original_name.pdf'
+                        # We need to rename it to flat name 'Folder_Sub_original.pdf'
+                        try:
+                            if pdf_result != final_pdf_path:
+                                if final_pdf_path.exists(): final_pdf_path.unlink()
+                                pdf_result.rename(final_pdf_path)
+                            
+                            report_items.append((file, vis_count, char_count, ratio, f"Converted to PDF"))
+                            print(f"    -> Success: {target_pdf_name}")
+                            
+                            # Copy to Merged folder (if enabled)
+                            if merger:
+                                 try:
+                                    shutil.copy2(final_pdf_path, merger.output_dir / target_pdf_name)
+                                 except Exception as e:
+                                    print(f"Error copying converted PDF to merged dir: {e}")
 
-                    # Copy to Merged folder (if enabled)
-                    if merger:
-                         try:
-                            shutil.copy2(file_path, merger.output_dir / output_filename)
-                         except Exception as e:
-                            print(f"Error copying High Density file to merged dir: {e}")
+                        except Exception as e:
+                            print(f"    Error renaming PDF: {e}")
+                            # Fallback if rename fails? Unlikely.
+                    else:
+                        # Fallback to Copy Original
+                        print("    [Fallback] PDF conversion failed. Copying original file.")
+                        report_items.append((file, vis_count, char_count, ratio, "Kept Original (PDF Fail)"))
+                        
+                        orig_out_name = get_output_filename(root_path, file_path, extension=ext)
+                        
+                        try:
+                            shutil.copy2(file_path, output_dir / orig_out_name)
+                        except Exception: pass
+                        
+                        if merger:
+                             try:
+                                shutil.copy2(file_path, merger.output_dir / orig_out_name)
+                             except Exception: pass
                     
                     continue # Skip Markdown conversion
 
@@ -535,7 +599,8 @@ def main():
              rating = "High" if r < TEXT_PER_VISUAL_THRESHOLD else "Low"
              print(f" {fname:<40} | {v:>7} | {int(r):>5} ({rating}) | {status}")
         print("-" * 90)
-        print(" * 'Kept Original': High visual density detected -> Copied as original file (skipped markdown conversion).")
+        print(" * 'Converted to PDF': High visual density -> Auto-converted to PDF via LibreOffice.")
+        print(" * 'Kept Original (PDF Fail)': PDF Conversion failed -> Copied original file.")
 
 
 

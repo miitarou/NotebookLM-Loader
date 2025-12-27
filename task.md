@@ -28,7 +28,7 @@
 - [x] **Universal Text Loader**: 拡張子不問でテキスト判定し、読み込むロジックの実装
 - [x] **Smart Chunking (Refined)**: ヘッダ込みの厳密な文字数計算と、バイナリSkipログの実装
 - [x] **Option Refactor**: `--combine` を廃止し `--merge` を追加（デフォルトはバラ出力のみ、指定時のみマージ生成）
-- [x] **Auto-Switch Logic**: High Density判定時に自動でテキスト変換をスキップし、元ファイルをコピーする実装
+- [x] **Auto-Switch Logic**: High Density判定時にPDF変換（LibreOffice）を実施。失敗時は元ファイルコピー。
 
 
 ## 検証・仕上げ
