@@ -1,5 +1,8 @@
 # NotebookLM Loader (Powered by MarkItDown)
 
+[ **English** | [日本語](README.md) | [中文](README_CN.md) ]
+
+
 This is a Python tool designed to convert Microsoft Office files (Word, Excel, PowerPoint) into a Markdown format optimized for **Google NotebookLM**.
 
 It utilizes **Microsoft's official `MarkItDown`** conversion engine for high-fidelity text extraction, effectively handling tables and lists.
