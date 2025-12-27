@@ -1,16 +1,16 @@
-# Office to NotebookLM Converter (Powered by MarkItDown)
+# Office to NotebookLM Converter
 
 Microsoft Officeファイル（Word, Excel, PowerPoint）を、NotebookLMでの利用に最適化されたMarkdown形式に一括変換するPythonツールです。
-**Microsoft公式の変換エンジン `MarkItDown`** を採用し、高い変換精度を実現しています。また、独自の「視覚要素検知レポート」により、NotebookLMに登録するべきファイル形式（Markdown vs PDF）の判断を支援します。
+**独自の最適化エンジン** を搭載し、Python 3.9以上で動作します。また、「視覚要素検知レポート」により、NotebookLMに登録するべきファイル形式（Markdown vs PDF）の判断を支援します。
 
 ## 主な機能
-1.  **高精度Markdown変換**: Microsoft MarkItDownを使用し、Officeファイルの構造を正確にテキスト化。コンテキスト情報も保持します。
+1.  **Officeファイルの一括変換**: フォルダやZIP内のファイルを解析し、コンテキスト情報を保持したままMarkdown化。
 2.  **視覚要素レポート**: 画像やグラフの多さを自動検知し、「このファイルはPDFでアップロードすべき」とアドバイス。
 3.  **PDF/Markdownの使い分け支援**: テキスト中心なら本ツール、図解中心ならPDF、という最適な運用を提案。
 
 ## 必要要件
-- Python 3.10以上
-- 必要なライブラリ: `markitdown`, `python-docx`, `openpyxl`, `python-pptx`, `pandas`
+- Python 3.9以上
+- 必要なライブラリ: `python-docx`, `openpyxl`, `python-pptx`, `pandas`
   - `pip install -r requirements.txt` でインストール可能
 
 ## インストール

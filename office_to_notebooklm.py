@@ -192,7 +192,7 @@ def process_directory(current_path, root_path, output_dir, args, report_items, c
                 if is_dense_visual or vis_count >= 5:
                     report_items.append((file, vis_count, char_count, ratio))
 
-            # 3. 変換
+            # 3. 変換 (MarkItDown Engine)
             markdown_content = convert_with_markitdown(file_path)
             
             if markdown_content:
@@ -245,7 +245,7 @@ def main():
         
     output_dir.mkdir(exist_ok=True)
     
-    print(f"Target: {target_path}")
+    print(f"\nTarget: {target_path}")
     print(f"Output: {output_dir}")
     print("-" * 50)
     
@@ -260,6 +260,7 @@ def main():
             with open(combined_path, 'w', encoding='utf-8') as f:
                 f.write(f"# Combined Output - {datetime.datetime.now()}\n\n")
                 f.write("".join(converted_files_content))
+            print(f"\n[Combined File Created] {combined_path}")
         except Exception as e:
             print(f"Error writing combined file: {e}")
 
@@ -269,13 +270,13 @@ def main():
     
     if report_items:
         print("\n[!] VISUAL DENSITY REPORT (PDF Recommendation)")
-        print(f" {'Filename':<30} | {'Visuals':<7} | {'Density'}")
-        print("-" * 60)
+        print(f" {'Filename':<40} | {'Visuals':<7} | {'Density'}")
+        print("-" * 70)
         for (fname, v, c, r) in report_items:
              rating = "High Density" if r < TEXT_PER_VISUAL_THRESHOLD else "Many Images"
-             print(f" {fname:<30} | {v:>7} | {int(r):>5} ({rating})")
-        print("-" * 60)
-        print(" * 'High Density' indicates text is sparse relative to visuals. Use PDF for these.")
+             print(f" {fname:<40} | {v:>7} | {int(r):>5} ({rating})")
+        print("-" * 70)
+        print(" * 'High Density' (Text/Visual ratio < 300) -> Use PDF for better AI understanding.")
 
 if __name__ == "__main__":
     main()

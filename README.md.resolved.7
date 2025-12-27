@@ -10,7 +10,7 @@ Microsoft Officeファイル（Word, Excel, PowerPoint）を、NotebookLMでの�
 
 ## 必要要件
 - Python 3.10以上
-- 必要なライブラリ: `markitdown`, `python-docx`, `openpyxl`, `python-pptx`, `pandas`
+- 必要なライブラリ: [markitdown](file:///Users/miitarou/.gemini/antigravity/brain/c9f679ed-ddb6-46b5-961a-7e796abc6428/office_to_notebooklm.py#93-103), `python-docx`, `openpyxl`, `python-pptx`, `pandas`
   - `pip install -r requirements.txt` でインストール可能
 
 ## インストール
@@ -44,7 +44,7 @@ python office_to_notebooklm.py /target/dir --combine --skip-ppt
 ```
 
 ## 注意事項 - 変換の仕様について
-- **MarkItDown Engine:** Microsoft公式の強力なパーサーを使用するため、表やリストなどの構造認識精度が高いです。変換されたテキストは、NotebookLMが文脈を理解するのに最適です。
+- **Engine:** Pythonライブラリを用いてテキストを抽出します。
 - **視覚要素レポート (Visual Density):** 
     - 実行後に表示されるレポートで「High Visual Density」と警告されたファイルは、Markdown変換では情報が欠落する可能性が高いです。
     - **推奨:** これらのファイルはMarkdownを使わず、**PDF形式**でNotebookLMに直接アップロードしてください。

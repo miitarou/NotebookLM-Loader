@@ -1,6 +1,6 @@
 {
   "artifactType":  "ARTIFACT_TYPE_TASK",
-  "summary":  "Marking migration tasks as complete.",
-  "updatedAt":  "2025-12-27T00:49:21.108995Z",
-  "version":  "9"
+  "summary":  "Marked verification tasks as completed.",
+  "updatedAt":  "2025-12-27T02:07:27.994552Z",
+  "version":  "11"
 }
