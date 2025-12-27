@@ -1,4 +1,4 @@
-# Office to NotebookLM Converter (Powered by MarkItDown)
+# NotebookLM Loader (Powered by MarkItDown)
 
 This is a Python tool designed to convert Microsoft Office files (Word, Excel, PowerPoint) into a Markdown format optimized for **Google NotebookLM**.
 
