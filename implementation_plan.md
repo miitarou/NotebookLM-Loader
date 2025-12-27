@@ -1,33 +1,30 @@
-# NotebookLM用 変換ツール アップグレード計画 (with MarkItDown & Zip Support)
+# NotebookLM用 変換ツール アップグレード計画 (with MarkItDown & Zip/Folder Support)
 
 ## 概要
 Microsoft公式の `markitdown` ライブラリをエンジンとして採用し、変換精度の向上と対応フォーマットの拡充を行います。
-さらに、実務で頻出する「ZIPファイル」や「深いフォルダ階層」に対応し、解凍の手間なく一発で処理できる運用性の高さを実現します。
+さらに、ZIP/フォルダ構造のメタデータを保持し、NotebookLMが文脈（どのプロジェクトの、どの階層の資料か）を理解できるようにします。
 
 ## 変更点
 
-### 1. `requirements.txt` の更新
-- 追加: `markitdown`
+### 1. `office_to_notebooklm.py` の機能強化
 
-### 2. `office_to_notebooklm.py` の機能強化
+#### フォルダ構造の保持 (Context Preservation)
+- **現状**: 全て `converted_files` 直下にフラットに出力されるため、同名ファイルが上書きされたり、元々どこのフォルダにあったかが分からなくなる。
+- **NotebookLMへのヒント**: AIコンテキストにおいて「ファイルパス」は重要なメタ情報です。
+- **対策**:
+    1. **ファイル名**: `元の親フォルダ名_ファイル名.md` のようにプレフィックスを付けてユニークにする（あるいは相対パスをアンダースコアで繋ぐ）。
+    2. **Markdownヘッダ**: ファイルの冒頭に以下のようなメタデータを埋め込む。
+       ```markdown
+       # File Metadata
+       - Original Path: Project/2024/Meeting_Logs/June.docx
+       - Source Archive: archive.zip (ZIPの場合)
+       ```
 
-#### フォルダ再帰処理 (Folder Recursion)
-- 現状の `os.walk` ですでに実装済み。サブフォルダ内のファイルも自動で見つけます。
-
-#### ZIPファイル対応 (Auto-Unzip)
-- **課題**: MarkItDown自身もZIPを読めるが、中身の個別ファイルに対する「視覚密度レポート（PDF推奨）」が出せない。
-- **対策**: スクリプト側でZIPを一時フォルダ (`_temp_extracted_xxx`) に解凍する処理を追加する。
-- **フロー**:
-    1. ファイル走査中に `.zip` を発見。
-    2. `zipfile` モジュールで解凍。
-    3. 解凍したフォルダに対して、再帰的にメインの処理（解析＆変換）を実行。
-    4. 処理後に一時フォルダを削除（オプション）。
-
-### 3. ハイブリッド構成（維持）
+### 2. ハイブリッド構成（維持）
 - **解析フェーズ (Architect)**: 画像数カウント等は自作ロジック。
 - **変換フェーズ (Builder)**: テキスト化はMarkItDown。
 
 ## 手順
-1. ZIP自動解凍ロジックの実装。
-2. 既存の `main` ループから、解凍したフォルダを再帰的に呼べるようにリファクタリング。
-3. 動作確認。
+1. 再帰処理時の `relative_path` を取得するようにロジック修正。
+2. 出力ファイル名生成ロジックを `path_to_filename` のような関数に変更。
+3. Markdown書き込み時にヘッダ情報を付与。

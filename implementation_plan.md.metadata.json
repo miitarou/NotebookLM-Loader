@@ -1,6 +1,6 @@
 {
   "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
-  "summary":  "Plan to add auto-unzip logic for full visual analysis of archived files.",
-  "updatedAt":  "2025-12-27T01:15:52.314160Z",
-  "version":  "3"
+  "summary":  "Plan to embed folder structure info into output filenames and markdown headers.",
+  "updatedAt":  "2025-12-27T01:41:35.313606Z",
+  "version":  "4"
 }
