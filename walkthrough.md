@@ -5,10 +5,11 @@
 
 ### 作成されたファイル
 - **`office_to_notebooklm.py`**: コアとなる変換スクリプト。
-    - **Engine**: Microsoft公式 `MarkItDown` ライブラリを採用し、高精度な変換を実現。
-    - **Visual Report**: 独自の解析ロジック（`python-docx`/`pptx`等）により、画像密度を計算しPDF利用を推奨。
-    - **Hybrid Architecture**: 「変換」はMicrosoft公式、「判断」は自作ロジックというハイブリッド構成。
-    - **オプション機能**: `--combine` で全変換結果を1ファイルに結合。 `--skip-ppt` でPPT変換をスキップ可。
+    - **MarkItDown Engine**: Microsoft公式ライブラリによる高精度なテキスト変換。
+    - **ZIP Support**: `.zip` ファイルを自動検知・解凍し、再帰的に処理。
+    - **Visual Report**: 自作ロジックで画像密度を計算し、PDF利用を推奨。
+    - **Hybrid Architecture**: 「変換」はMarkItDown、「判断」は自作ロジックのハイブリッド。
+    - **オプション**: `--combine` (結合), `--skip-ppt` (PPTスキップ)。
 - **`requirements.txt`**: 必要なライブラリ一覧。
 - **`README.md`**: インストールおよび使用方法のガイド。
 

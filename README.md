@@ -22,10 +22,17 @@ Microsoft Officeファイル（Word, Excel, PowerPoint）を、NotebookLMでの�
 
 ## 使い方 (Usage)
 
-変換したいOfficeファイルが入ったフォルダを指定して実行します。
+変換したいOfficeファイルが入った**フォルダ**、または **ZIPファイル** を指定して実行します。
 
+### フォルダを指定する場合
 ```bash
 python office_to_notebooklm.py /Users/yourname/Documents/MyProject
+```
+
+### ZIPファイルを直接指定する場合
+ZIPファイルを自動で一時フォルダに展開し、中身を変換・解析します。
+```bash
+python office_to_notebooklm.py /Users/yourname/Documents/archive.zip
 ```
 
 ### オプション

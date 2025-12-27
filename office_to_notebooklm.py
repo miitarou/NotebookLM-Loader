@@ -8,57 +8,43 @@ from pptx import Presentation
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 import datetime
 from markitdown import MarkItDown
+import zipfile
+import shutil
+import tempfile
 
 # 定数など
 OUTPUT_DIR_NAME = "converted_files"
 COMBINED_FILENAME = "All_Files_Combined.txt"
 
 # 判定閾値（目安）
-# 画像1枚あたりの文字数がこれ以下なら「図解中心」とみなす
 TEXT_PER_VISUAL_THRESHOLD = 300 
 
 def setup_args():
     parser = argparse.ArgumentParser(description='Office files to Markdown converter for NotebookLM')
-    parser.add_argument('target_dir', help='Target directory containing Office files')
+    parser.add_argument('target_dir', help='Target directory containing Office files or ZIP file')
     parser.add_argument('--combine', action='store_true', help='Combine all converted files into one single text file')
     parser.add_argument('--skip-ppt', action='store_true', help='Skip PowerPoint files (recommend using PDF for visual-heavy PPTs)')
     return parser.parse_args()
 
-def get_image_alt_text(shape):
-    """画像の代替テキストを取得する（可能な場合）"""
-    try:
-        return shape.name or "Image"
-    except:
-        return "Image"
-
 def analyze_docx(file_path):
-    """Wordファイルの視覚要素密度を解析する。戻り値: (visual_count, char_count)"""
     try:
         doc = docx.Document(file_path)
         visual_count = 0
         char_count = 0
-        
         for para in doc.paragraphs:
             text = para.text.strip()
             char_count += len(text)
-            
-            # 画像（InlineShape）の簡易検出
             for run in para.runs:
                 if run.element.xpath('.//a:blip'):
                      visual_count += 1
-        
         return visual_count, char_count
-    except Exception as e:
-        print(f"Error analyzing docx {file_path}: {e}")
+    except:
         return 0, 0
 
 def analyze_xlsx(file_path):
-    """Excelファイルの視覚要素密度を解析する。戻り値: (visual_count, char_count)"""
     try:
         visual_count = 0
         char_count = 0
-        
-        # チャート検出用
         try:
             wb_obj = openpyxl.load_workbook(file_path, data_only=True)
             for sheet_name in wb_obj.sheetnames:
@@ -67,10 +53,7 @@ def analyze_xlsx(file_path):
                     visual_count += len(sheet._charts)
         except:
             pass 
-
-        # データ読み込み用 (文字数カウント)
         wb = openpyxl.load_workbook(file_path, data_only=True)
-        
         for sheet_name in wb.sheetnames:
             try:
                 df = pd.read_excel(file_path, sheet_name=sheet_name)
@@ -79,163 +62,192 @@ def analyze_xlsx(file_path):
                     char_count += len(csv_text)
             except:
                 pass
-
         return visual_count, char_count
-    except Exception as e:
-        print(f"Error analyzing xlsx {file_path}: {e}")
+    except:
         return 0, 0
 
 def analyze_pptx(file_path):
-    """PPTファイルの視覚要素密度を解析する。戻り値: (visual_count, char_count)"""
     try:
         prs = Presentation(file_path)
         visual_count = 0
         char_count = 0
-        
         for slide in prs.slides:
             if slide.shapes.title:
                 char_count += len(slide.shapes.title.text.strip())
-            
             for shape in slide.shapes:
                 if shape == slide.shapes.title:
                     continue
-                
                 if shape.has_text_frame:
                     char_count += len(shape.text_frame.text.strip())
-                
-                # 画像・図形のカウント
                 is_visual = False
-                if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
-                    is_visual = True
-                elif shape.shape_type == MSO_SHAPE_TYPE.GROUP:
-                    is_visual = True
+                if shape.shape_type == MSO_SHAPE_TYPE.PICTURE: is_visual = True
+                elif shape.shape_type == MSO_SHAPE_TYPE.GROUP: is_visual = True
                 elif shape.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE:
-                     if not shape.has_text_frame or not shape.text_frame.text.strip():
-                         is_visual = True
-                
-                if is_visual:
-                    visual_count += 1
-        
+                     if not shape.has_text_frame or not shape.text_frame.text.strip(): is_visual = True
+                if is_visual: visual_count += 1
         return visual_count, char_count
-    except Exception as e:
-        print(f"Error analyzing pptx {file_path}: {e}")
+    except:
         return 0, 0
 
 def convert_with_markitdown(file_path):
-    """MarkItDownを使ってファイルをMarkdownに変換する"""
     try:
         md = MarkItDown()
-        result = md.convert(str(file_path)) # MarkItDown takes file path as string or LocalFileSource
+        result = md.convert(str(file_path)) 
         if result and result.text_content:
             return result.text_content
         return ""
     except Exception as e:
-        print(f"Error converting with MarkItDown {file_path}: {e}")
+        print(f"    Error converting {file_path.name}: {e}")
         return None
+
+def process_directory(current_path, output_dir, args, report_items, converted_files_content, processed_zips=None):
+    """ディレクトリを再帰的に処理する関数（ZIP対応版）"""
+    if processed_zips is None:
+        processed_zips = set()
+
+    # current_pathがファイル(ZIP)の場合の対応
+    if current_path.is_file() and current_path.suffix.lower() == '.zip':
+        if current_path in processed_zips: return
+        processed_zips.add(current_path)
+        
+        print(f"Extracting ZIP: {current_path.name} ...")
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                with zipfile.ZipFile(current_path, 'r') as zip_ref:
+                    zip_ref.extractall(temp_dir)
+                # 解凍した一時フォルダに対して再帰呼び出し
+                process_directory(Path(temp_dir), output_dir, args, report_items, converted_files_content, processed_zips)
+        except Exception as e:
+            print(f"Error processing zip {current_path}: {e}")
+        return
+
+    # ディレクトリ処理
+    for root, dirs, files in os.walk(current_path):
+        if OUTPUT_DIR_NAME in root: continue
+            
+        for file in files:
+            file_path = Path(root) / file
+            ext = file_path.suffix.lower()
+            
+            # ZIPファイルの再帰処理
+            if ext == '.zip':
+                # os.walkで回ってくるZIPを処理
+                if file_path not in processed_zips:
+                    processed_zips.add(file_path)
+                    print(f"Extracting nested ZIP: {file} ...")
+                    try:
+                        with tempfile.TemporaryDirectory() as temp_dir:
+                            with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                                zip_ref.extractall(temp_dir)
+                            process_directory(Path(temp_dir), output_dir, args, report_items, converted_files_content, processed_zips)
+                    except Exception as e:
+                        print(f"Error processing nested zip {file}: {e}")
+                continue
+
+            vis_count = 0
+            char_count = 0
+            
+            # 1. 解析
+            if ext == '.docx':
+                print(f"Processing: {file}")
+                vis_count, char_count = analyze_docx(file_path)
+            elif ext == '.xlsx':
+                print(f"Processing: {file}")
+                vis_count, char_count = analyze_xlsx(file_path)
+            elif ext == '.pptx':
+                if args.skip_ppt:
+                    print(f"Skipping PPT: {file}")
+                    continue
+                print(f"Processing: {file}")
+                vis_count, char_count = analyze_pptx(file_path)
+            else:
+                continue 
+
+            # 2. レポートデータ
+            if vis_count > 0:
+                ratio = char_count / vis_count if vis_count > 0 else 9999
+                is_dense_visual = ratio < TEXT_PER_VISUAL_THRESHOLD
+                if is_dense_visual or vis_count >= 5:
+                    report_items.append((file, vis_count, char_count, ratio))
+
+            # 3. 変換
+            markdown_content = convert_with_markitdown(file_path)
+            
+            if markdown_content:
+                output_filename = f"{file_path.stem}.md"
+                # 同名ファイル対策: 各ファイルのユニーク性を保つため、
+                # ZIP解凍などフラット展開時はファイル名重複のリスクがあるが、
+                # 今回はシンプルに上書き or 追記。
+                # ただし、output_dirは常に一つなので、サブフォルダ構成を維持するか、リネームが必要。
+                # ここでは簡易的に「全てフラットにoutput_dirに出す」仕様とする。
+                output_path = output_dir / output_filename
+                
+                # 重複回避ロジック
+                counter = 1
+                while output_path.exists():
+                    output_path = output_dir / f"{file_path.stem}_{counter}.md"
+                    counter += 1
+
+                try:
+                    with open(output_path, 'w', encoding='utf-8') as f:
+                        f.write(f"# Source: {file}\n\n{markdown_content}")
+                    
+                    if args.combine:
+                        converted_files_content.append(f"# Source: {file}\n\n")
+                        converted_files_content.append(markdown_content)
+                        converted_files_content.append("\n\n---\n\n")
+                except Exception as e:
+                    print(f"Failed to write {output_path}: {e}")
 
 def main():
     args = setup_args()
     target_path = Path(args.target_dir)
     
     if not target_path.exists():
-        print(f"Error: Directory '{target_path}' not found.")
+        print(f"Error: Path '{target_path}' not found.")
         return
 
-    output_dir = target_path / OUTPUT_DIR_NAME
+    # 出力先はカレントディレクトリの converted_files とする（入力がZIPの場合、その中に出せないため）
+    # もしくは入力がディレクトリならその直下。
+    if target_path.is_dir():
+        output_dir = target_path / OUTPUT_DIR_NAME
+    else:
+        # File (Zip) case
+        output_dir = target_path.parent / OUTPUT_DIR_NAME
+        
     output_dir.mkdir(exist_ok=True)
     
-    print(f"Start converting files in: {target_path}")
-    print(f"Using Engine: Microsoft MarkItDown")
-    print(f"Output directory: {output_dir}")
+    print(f"Target: {target_path}")
+    print(f"Output: {output_dir}")
+    print("-" * 50)
     
     converted_files_content = []
-    # (filename, visual_count, char_count, ratio)
     report_items = [] 
-
-    for root, dirs, files in os.walk(target_path):
-        if OUTPUT_DIR_NAME in root:
-            continue
-            
-        for file in files:
-            file_path = Path(root) / file
-            ext = file_path.suffix.lower()
-            
-            markdown_content = None
-            vis_count = 0
-            char_count = 0
-            
-            # 1. まず解析 (Analyze)
-            if ext == '.docx':
-                print(f"Analyzing: {file} ...")
-                vis_count, char_count = analyze_docx(file_path)
-            elif ext == '.xlsx':
-                print(f"Analyzing: {file} ...")
-                vis_count, char_count = analyze_xlsx(file_path)
-            elif ext == '.pptx':
-                if args.skip_ppt:
-                    print(f"Skipping PPT (as requested): {file}")
-                    continue
-                print(f"Analyzing: {file} ...")
-                vis_count, char_count = analyze_pptx(file_path)
-            else:
-                continue # 対象外の拡張子
-
-            # 2. レポートデータの蓄積
-            if vis_count > 0:
-                ratio = char_count / vis_count if vis_count > 0 else 9999
-                is_dense_visual = ratio < TEXT_PER_VISUAL_THRESHOLD
-                
-                if is_dense_visual or vis_count >= 5:
-                    report_items.append((file, vis_count, char_count, ratio))
-
-            # 3. 変換 (Convert) - MarkItDownを利用
-            # PPTスキップが指定されていて、かつPPTの場合は既にcontinueされている
-            # ここでは「解析結果にかかわらず、とりあえずMD変換は行う」（ユーザーが選べるように）
-            print(f"  Converting with MarkItDown...")
-            markdown_content = convert_with_markitdown(file_path)
-            
-            if markdown_content:
-                output_filename = f"{file_path.stem}.md"
-                output_path = output_dir / output_filename
-                try:
-                    with open(output_path, 'w', encoding='utf-8') as f:
-                        # ヘッダーを付ける
-                        f.write(f"# File: {file}\n\n")
-                        f.write(markdown_content)
-                    
-                    if args.combine:
-                        converted_files_content.append(f"# File: {file}\n\n")
-                        converted_files_content.append(markdown_content)
-                        converted_files_content.append("\n\n---\n\n")
-                except Exception as e:
-                    print(f"Failed to write disk {output_path}: {e}")
+    
+    process_directory(target_path, output_dir, args, report_items, converted_files_content)
 
     if args.combine and converted_files_content:
         combined_path = output_dir / COMBINED_FILENAME
         try:
             with open(combined_path, 'w', encoding='utf-8') as f:
-                f.write(f"# All Files Combined - {datetime.datetime.now()}\n\n")
+                f.write(f"# Combined Output - {datetime.datetime.now()}\n\n")
                 f.write("".join(converted_files_content))
         except Exception as e:
-            print(f"Error creating combined file: {e}")
+            print(f"Error writing combined file: {e}")
 
     print("\n" + "="*60)
-    print(" CONVERSION COMPLETED (Powered by MarkItDown)")
+    print(" COMPLETED")
     print("="*60)
     
     if report_items:
-        print("\n[!] VISUAL CONTENT REPORT")
-        print("以下のファイルは「テキストに対して画像/図解の比率が高い」か「画像が大量」です。")
-        print("Markdown変換では文脈が損なわれる可能性があるため、")
-        print("『PDF形式』でNotebookLMにアップロードすることを強く推奨します。")
-        print("-" * 75)
-        print(f" {'Filename':<30} | {'Visuals':<7} | {'Chars':<7} | {'Chars/Vis (Density)'}")
-        print("-" * 75)
+        print("\n[!] VISUAL DENSITY REPORT (PDF Recommendation)")
+        print(f" {'Filename':<30} | {'Visuals':<7} | {'Density'}")
+        print("-" * 60)
         for (fname, v, c, r) in report_items:
-             rating = "High Visual Density" if r < TEXT_PER_VISUAL_THRESHOLD else "Many Images"
-             print(f" {fname:<30} | {v:>7} | {c:>7} | {int(r):>5} ({rating})")
-        print("-" * 75)
-        print(f" (Threshold: < {TEXT_PER_VISUAL_THRESHOLD} chars per visual is considered 'Visual Heavy')\n")
+             rating = "High Density" if r < TEXT_PER_VISUAL_THRESHOLD else "Many Images"
+             print(f" {fname:<30} | {v:>7} | {int(r):>5} ({rating})")
+        print("-" * 60)
+        print(" * 'High Density' indicates text is sparse relative to visuals. Use PDF for these.")
 
 if __name__ == "__main__":
     main()
