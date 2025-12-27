@@ -6,8 +6,8 @@ Microsoft Officeファイル（Word, Excel, PowerPoint）を、NotebookLMでの�
 ## 主な機能
 1.  **Smart Chunking (自動分割結合)**: フォルダ内の大量のファイルを、NotebookLMが読みやすいサイズ（約20万文字）ごとに自動で結合・分割して `Merged_Files_VolXX.md` にまとめます。数千ファイルあってもドラッグ＆ドロップ数回で済みます。
 2.  **All-in-One Loader**: Officeファイル、PDF、ソースコード、テキストなど、フォルダ内のあらゆる可読データを自動検知して取り込みます。
-3.  **高精度Markdown変換**: Microsoft MarkItDownを使用し、Officeファイルの構造を正確にテキスト化。
-4.  **視覚要素レポート**: 画像やグラフの多さを自動検知し、「このファイルはPDFでアップロードすべき」とアドバイス。
+3.  **Auto-Switch (自動形式判断)**: 画像やグラフが多いファイル（High Density）は、無理にテキスト化せず**元の形式（PPT/DOCX）のまま出力**します。これにより、NotebookLMの画像認識能力を最大限に活かせます。
+4.  **高精度Markdown変換**: Microsoft MarkItDownを使用し、リストや表などの構造を正確にテキスト化します。
 
 ## 必要要件
 - Python 3.10以上
@@ -37,11 +37,11 @@ python office_to_notebooklm.py /Users/yourname/Documents/archive.zip
 ```
 
 ### オプション
-- `--combine`: 全変換ファイルを `All_Files_Combined.txt` という1つのファイルに結合します。
+- `--merge`: `converted_files_merged` フォルダを作成し、スマート結合されたファイルを生成します。
 - `--skip-ppt`: PowerPoint (.pptx) の変換をスキップします（PPTはPDF利用を推奨するため）。
 
 ```bash
-python office_to_notebooklm.py /target/dir --combine --skip-ppt
+python office_to_notebooklm.py /target/dir --merge --skip-ppt
 ```
 
 ## 注意事項 - 変換の仕様について

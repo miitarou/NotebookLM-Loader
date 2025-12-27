@@ -342,27 +342,60 @@ def process_directory(current_path, root_path, output_dir, args, report_items, m
             
             # --- File Type Handling ---
 
+            # Determine High Density first (Shared Logic)
+            is_high_density = False
+            
             # 1. Office Files
             if ext == '.docx':
                 print(f"Processing: {file}")
                 vis_count, char_count = analyze_docx(file_path)
-                markdown_content = convert_with_markitdown(file_path)
-            
             elif ext == '.xlsx':
                 print(f"Processing: {file}")
                 vis_count, char_count = analyze_xlsx(file_path)
-                markdown_content = convert_with_markitdown(file_path)
-
             elif ext == '.pptx':
                 if args.skip_ppt:
                     print(f"Skipping PPT: {file}")
                     continue
                 print(f"Processing: {file}")
                 vis_count, char_count = analyze_pptx(file_path)
-                markdown_content = convert_with_markitdown(file_path)
+            else:
+                # Not an office file we analyze for density
+                pass
+
+            # Check Density if it was analyzed
+            if ext in ['.docx', '.xlsx', '.pptx']:
+                ratio = char_count / vis_count if vis_count > 0 else 9999
+                is_dense_visual = ratio < TEXT_PER_VISUAL_THRESHOLD
+                if is_dense_visual or vis_count >= 5:
+                    is_high_density = True
+                    print(f"  [Auto-Switch] High density detected (Visuals: {vis_count}, Ratio: {int(ratio)}). Kept as original.")
+                    report_items.append((file, vis_count, char_count, ratio, "Kept Original"))
+                    
+                    # Copy Original File Logic (Pass-through)
+                    output_filename = get_output_filename(root_path, file_path, extension=ext) # Use Original Ext
+                    
+                    # Copy to Single folder
+                    try:
+                        shutil.copy2(file_path, output_dir / output_filename)
+                    except Exception:
+                        pass
+
+                    # Copy to Merged folder (if enabled)
+                    if merger:
+                         try:
+                            shutil.copy2(file_path, merger.output_dir / output_filename)
+                         except Exception as e:
+                            print(f"Error copying High Density file to merged dir: {e}")
+                    
+                    continue # Skip Markdown conversion
+
+                else:
+                    # Low Density -> Proceed completion
+                    # We need to run conversion now since we only analyzed so far
+                    markdown_content = convert_with_markitdown(file_path)
 
             # 2. PDF Files (Direct Copy -> Merged Dir)
-            elif ext == '.pdf':
+            if ext == '.pdf':
                 print(f"Copying PDF: {file}")
                 output_filename = get_output_filename(root_path, file_path, extension=".pdf")
                 
@@ -382,7 +415,8 @@ def process_directory(current_path, root_path, output_dir, args, report_items, m
                 continue 
 
             # 3. Universal Text Loader (Any text file)
-            else:
+            # (Strictly else if not handled above. Note: Office files handled above continue or set markdown_content)
+            elif ext not in ['.docx', '.xlsx', '.pptx', '.pdf']:
                 # Check known extensions OR try to read as UTF-8
                 is_known_text = ext in TEXT_EXTENSIONS
                 is_readable_text = False
@@ -406,11 +440,12 @@ def process_directory(current_path, root_path, output_dir, args, report_items, m
 
             # --- Post-Processing (Report & Write) ---
 
-            if vis_count > 0:
-                ratio = char_count / vis_count if vis_count > 0 else 9999
-                is_dense_visual = ratio < TEXT_PER_VISUAL_THRESHOLD
-                if is_dense_visual or vis_count >= 5:
-                    report_items.append((file, vis_count, char_count, ratio))
+            # Report Logic (For converted files that might still have some visuals)
+            if vis_count > 0 and ext in ['.docx', '.xlsx', '.pptx']:
+                 # If we are here, it wasn't high density enough to switch, but maybe worth noting?
+                 # Actually, let's strictly log the ones we converted too if they had visuals
+                 ratio = char_count / vis_count if vis_count > 0 else 9999
+                 report_items.append((file, vis_count, char_count, ratio, "Converted"))
 
             if markdown_content:
                 # 構造を維持したファイル名を生成
@@ -493,14 +528,14 @@ def main():
     print("="*60)
     
     if report_items:
-        print("\n[!] VISUAL DENSITY REPORT (PDF Recommendation)")
-        print(f" {'Filename':<40} | {'Visuals':<7} | {'Density'}")
-        print("-" * 70)
-        for (fname, v, c, r) in report_items:
-             rating = "High Density" if r < TEXT_PER_VISUAL_THRESHOLD else "Many Images"
-             print(f" {fname:<40} | {v:>7} | {int(r):>5} ({rating})")
-        print("-" * 70)
-        print(" * 'High Density' (Text/Visual ratio < 300) -> Use PDF for better AI understanding.")
+        print("\n[!] PROCESSED FILE REPORT (Visual Density)")
+        print(f" {'Filename':<40} | {'Visuals':<7} | {'Density':<7} | {'Status'}")
+        print("-" * 90)
+        for (fname, v, c, r, status) in report_items:
+             rating = "High" if r < TEXT_PER_VISUAL_THRESHOLD else "Low"
+             print(f" {fname:<40} | {v:>7} | {int(r):>5} ({rating}) | {status}")
+        print("-" * 90)
+        print(" * 'Kept Original': High visual density detected -> Copied as original file (skipped markdown conversion).")
 
 
 
