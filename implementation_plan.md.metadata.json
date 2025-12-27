@@ -1,6 +1,6 @@
 {
   "artifactType":  "ARTIFACT_TYPE_IMPLEMENTATION_PLAN",
-  "summary":  "Added plans for non-Office file handling (text passthrough, binary copy).",
-  "updatedAt":  "2025-12-27T02:22:33.820722Z",
-  "version":  "5"
+  "summary":  "Added plans for Smart Chunking and Universal Text Support.",
+  "updatedAt":  "2025-12-27T10:41:19.728532Z",
+  "version":  "6"
 }

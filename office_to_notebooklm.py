@@ -157,10 +157,125 @@ def extract_zip_with_encoding(zip_path, extract_to):
                 with z.open(file_info) as source, open(target_path, "wb") as target:
                     shutil.copyfileobj(source, target)
 
-def process_directory(current_path, root_path, output_dir, args, report_items, converted_files_content, processed_zips=None):
+
+# ---------------------------------------------------------
+# Feature: Smart Chunking & Merged Output
+# ---------------------------------------------------------
+
+MAX_CHARS_PER_VOLUME = 200000  # NotebookLM approximate token limit safeguard
+
+class MergedOutputManager:
+    def __init__(self, output_dir):
+        self.output_dir = output_dir
+        self.output_dir.mkdir(exist_ok=True)
+        self.current_vol = 1
+        self.current_content = []
+        self.current_char_count = 0
+        self.file_index = [] # List of filenames included in current vol
+
+    def add_content(self, filename, content):
+        """
+        コンテンツを追加する。
+        もしコンテンツ単体で制限を超える場合は、分割して追加する（Recursive Split）。
+        追加によって制限を超える場合は、現在のVolを書き出して次へ行く。
+        """
+        content_len = len(content)
+
+        # Case 1: Huge single file -> Recursive Split
+        if content_len > MAX_CHARS_PER_VOLUME:
+            self._handle_huge_file(filename, content)
+            return
+
+        # Case 2: Buffer overflow -> Flush and define new volume
+        if self.current_char_count + content_len > MAX_CHARS_PER_VOLUME:
+            self._flush_volume()
+
+        # Normal Add
+        self.current_content.append(content)
+        self.current_char_count += content_len
+        self.file_index.append(filename)
+
+    def _handle_huge_file(self, filename, content):
+        """巨大ファイルを分割して登録する"""
+        parts = []
+        remaining = content
+        part_num = 1
+        
+        while remaining:
+            # 切り出しサイズ（余裕を見て少し小さめに）
+            chunk_size = MAX_CHARS_PER_VOLUME - 500
+            if len(remaining) > chunk_size:
+                # 改行などで区切りたいが、簡易実装として文字数でバッサリいく
+                # (MarkItDownの結果ならMarkdown構造があるが、安全側に倒す)
+                c_chunk = remaining[:chunk_size]
+                remaining = remaining[chunk_size:]
+            else:
+                c_chunk = remaining
+                remaining = ""
+            
+            header = f"\n\n# {filename} (Part {part_num})\n\n"
+            full_chunk = header + c_chunk
+            
+            # Flush current buffer if needed (unlikely to fit if we are splitting huge file)
+            if self.current_char_count > 0:
+                 self._flush_volume()
+            
+            # Add chunk to buffer and flush immediately (since it's huge)
+            self.current_content.append(full_chunk)
+            self.file_index.append(f"{filename} (Part {part_num})")
+            self.current_char_count += len(full_chunk)
+            self._flush_volume()
+            
+            part_num += 1
+
+    def _flush_volume(self):
+        """現在のバッファをファイルに書き出す"""
+        if not self.current_content:
+            return
+
+        vol_filename = f"Merged_Files_Vol{self.current_vol:02d}.md"
+        output_path = self.output_dir / vol_filename
+        
+        # 目次生成
+        index_text = "# Table of Contents\n" + "\n".join([f"- {name}" for name in self.file_index]) + "\n\n---\n\n"
+        
+        full_text = index_text + "\n".join(self.current_content)
+        
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(full_text)
+            print(f"[Merged Created] {vol_filename} ({len(full_text)} chars)")
+        except Exception as e:
+            print(f"Error writing volume {vol_filename}: {e}")
+
+        # Reset
+        self.current_vol += 1
+        self.current_content = []
+        self.current_char_count = 0
+        self.file_index = []
+
+    def finalize(self):
+        """最後に残っているバッファを書き出す"""
+        self._flush_volume()
+
+
+def is_text_file(file_path):
+    """拡張子に関わらず、UTF-8テキストとして読めるか判定する"""
+    try:
+        # 先頭4KB程度読んで判定
+        with open(file_path, 'r', encoding='utf-8') as f:
+             f.read(4000)
+        return True
+    except UnicodeDecodeError:
+        return False
+    except Exception:
+        return False
+
+
+def process_directory(current_path, root_path, output_dir, args, report_items, merger, processed_zips=None):
     """
     ディレクトリを再帰的に処理する関数
-    root_path: 処理の基点となるパス（相対パス計算用）
+    merger: MergedOutputManager instance
     """
     if processed_zips is None:
         processed_zips = set()
@@ -173,21 +288,21 @@ def process_directory(current_path, root_path, output_dir, args, report_items, c
         print(f"Extracting ZIP: {current_path.name} ...")
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
-                # Custom extraction to handle encoding
                 extract_zip_with_encoding(current_path, temp_dir)
-                
-                # ZIPの中身を処理するとき、root_pathはその一時フォルダにする（ZIP内構造を維持するため）
-                process_directory(Path(temp_dir), Path(temp_dir), output_dir, args, report_items, converted_files_content, processed_zips)
+                process_directory(Path(temp_dir), Path(temp_dir), output_dir, args, report_items, merger, processed_zips)
         except Exception as e:
             print(f"Error processing zip {current_path}: {e}")
         return
 
     # ディレクトリ処理
     for root, dirs, files in os.walk(current_path):
-        if OUTPUT_DIR_NAME in root: continue
+        if OUTPUT_DIR_NAME in root or "converted_files_merged" in root: continue
             
         for file in files:
             file_path = Path(root) / file
+            # Rename hidden files or specific system files if needed, but 'is_text_file' helps.
+            if file.startswith('.'): continue
+            
             ext = file_path.suffix.lower()
             
             # ZIPファイルの再帰処理
@@ -197,11 +312,8 @@ def process_directory(current_path, root_path, output_dir, args, report_items, c
                     print(f"Extracting nested ZIP: {file} ...")
                     try:
                         with tempfile.TemporaryDirectory() as temp_dir:
-                            # Custom extraction to handle encoding
                             extract_zip_with_encoding(file_path, temp_dir)
-                            
-                            # Nested ZIPもその内部構造を維持する
-                            process_directory(Path(temp_dir), Path(temp_dir), output_dir, args, report_items, converted_files_content, processed_zips)
+                            process_directory(Path(temp_dir), Path(temp_dir), output_dir, args, report_items, merger, processed_zips)
                     except Exception as e:
                         print(f"Error processing nested zip {file}: {e}")
                 continue
@@ -209,7 +321,7 @@ def process_directory(current_path, root_path, output_dir, args, report_items, c
             vis_count = 0
             char_count = 0
             markdown_content = ""
-            is_copy_optimization = False
+            current_output_filename_base = ""
 
             # --- File Type Handling ---
 
@@ -232,56 +344,67 @@ def process_directory(current_path, root_path, output_dir, args, report_items, c
                 vis_count, char_count = analyze_pptx(file_path)
                 markdown_content = convert_with_markitdown(file_path)
 
-            # 2. PDF Files (Direct Copy with Renaming)
+            # 2. PDF Files (Direct Copy -> Merged Dir)
             elif ext == '.pdf':
                 print(f"Copying PDF: {file}")
                 output_filename = get_output_filename(root_path, file_path, extension=".pdf")
+                # PDFはMergeせず、Mergedフォルダに直接コピーする
+                if merger:
+                     try:
+                        shutil.copy2(file_path, merger.output_dir / output_filename)
+                     except Exception as e:
+                        print(f"Error copying PDF to merged dir: {e}")
+                
+                # Single file output (optional, but keeping behavior consistent)
                 output_path = output_dir / output_filename
                 try:
                     shutil.copy2(file_path, output_path)
-                except Exception as e:
-                    print(f"Error copying PDF {file}: {e}")
-                continue # PDF processing ends here (no markdown wrap)
-
-            # 3. Text Files (Read and Wrap)
-            elif ext in TEXT_EXTENSIONS:
-                print(f"Processing Text: {file}")
-                try:
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        markdown_content = f.read()
-                        markdown_content = f"```\n{markdown_content}\n```" # Wrap in code block for clarity? Or just raw? User said "add metadata header".
-                        # Let's keep it raw text but with Markdown header, so it behaves like a document. 
-                        # If it's code, MarkItDown usually wraps in blocks, but here we are raw reading. 
-                        # Let's just output raw content.
-                except Exception as e:
-                    print(f"Error reading text file {file}: {e}")
-                    markdown_content = ""
-            
-            else:
+                except Exception:
+                    pass
                 continue 
+
+            # 3. Universal Text Loader (Any text file)
+            else:
+                # Check known extensions OR try to read as UTF-8
+                is_known_text = ext in TEXT_EXTENSIONS
+                is_readable_text = False
+                if not is_known_text:
+                    if is_text_file(file_path):
+                        is_readable_text = True
+                
+                if is_known_text or is_readable_text:
+                    print(f"Processing Text[{ext}]: {file}")
+                    try:
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            markdown_content = f.read()
+                            # 読みやすさのためCodeBlockで囲むかは任意だが、汎用テキストはそのままの方が検索しやすい場合も多い
+                            # ここでは MarkdownヘッダーをつけるのでそのままでOK
+                            if not markdown_content.strip(): markdown_content = "(Empty File)"
+                    except Exception as e:
+                        print(f"Error reading text file {file}: {e}")
+                        markdown_content = ""
+                else:
+                    # Binary or unknown
+                    continue
 
             # --- Post-Processing (Report & Write) ---
 
-            # Report Logic (Office only mostly, but logic is generic based on counts)
             if vis_count > 0:
                 ratio = char_count / vis_count if vis_count > 0 else 9999
                 is_dense_visual = ratio < TEXT_PER_VISUAL_THRESHOLD
                 if is_dense_visual or vis_count >= 5:
                     report_items.append((file, vis_count, char_count, ratio))
 
-            # Write Output
             if markdown_content:
                 # 構造を維持したファイル名を生成
                 output_filename = get_output_filename(root_path, file_path, extension=".md")
                 output_path = output_dir / output_filename
                 
-                # 相対パス（コンテキスト用）
                 try:
                     rel_path_str = str(file_path.relative_to(root_path))
                 except:
                     rel_path_str = file if isinstance(file, str) else file.name
 
-                # メタデータヘッダーの作成
                 metadata_header = f"""# File Info
 - Original Filename: {file}
 - Relative Path: {rel_path_str}
@@ -289,17 +412,19 @@ def process_directory(current_path, root_path, output_dir, args, report_items, c
 
 ---
 """
-                final_content = metadata_header + markdown_content
+                final_content = metadata_header + markdown_content + "\n\n---\n\n"
 
+                # 1. Write individual file (Legacy support)
                 try:
                     with open(output_path, 'w', encoding='utf-8') as f:
                         f.write(final_content)
-                    
-                    if args.combine:
-                        converted_files_content.append(final_content)
-                        converted_files_content.append("\n\n---\n\n")
                 except Exception as e:
-                    print(f"Failed to write {output_path}: {e}")
+                    print(f"Failed to write individual {output_path}: {e}")
+                
+                # 2. Add to Smart Merger
+                if merger:
+                    merger.add_content(output_filename, final_content)
+
 
 def main():
     args = setup_args()
@@ -309,35 +434,31 @@ def main():
         print(f"Error: Path '{target_path}' not found.")
         return
 
-    # Output directory
     if target_path.is_dir():
         output_dir = target_path / OUTPUT_DIR_NAME
-        root_processing_path = target_path # フォルダ指定ならそのフォルダがroot
+        merged_dir = target_path / (OUTPUT_DIR_NAME + "_merged")
+        root_processing_path = target_path
     else:
-        # File (Zip) case
         output_dir = target_path.parent / OUTPUT_DIR_NAME
-        root_processing_path = target_path.parent # 単体ファイルなら親がroot (Zipの場合は内部処理で上書きされる)
+        merged_dir = target_path.parent / (OUTPUT_DIR_NAME + "_merged")
+        root_processing_path = target_path.parent
         
     output_dir.mkdir(exist_ok=True)
-    
+    # merged_dir is created by manager
+
     print(f"\nTarget: {target_path}")
     print(f"Output: {output_dir}")
+    print(f"Merged: {merged_dir}")
     print("-" * 50)
     
-    converted_files_content = []
+    # Initialize Manager
+    merger = MergedOutputManager(merged_dir)
     report_items = [] 
     
-    process_directory(target_path, root_processing_path, output_dir, args, report_items, converted_files_content)
-
-    if args.combine and converted_files_content:
-        combined_path = output_dir / COMBINED_FILENAME
-        try:
-            with open(combined_path, 'w', encoding='utf-8') as f:
-                f.write(f"# Combined Output - {datetime.datetime.now()}\n\n")
-                f.write("".join(converted_files_content))
-            print(f"\n[Combined File Created] {combined_path}")
-        except Exception as e:
-            print(f"Error writing combined file: {e}")
+    process_directory(target_path, root_processing_path, output_dir, args, report_items, merger)
+    
+    # Finalize Merge
+    merger.finalize()
 
     print("\n" + "="*60)
     print(" COMPLETED")
@@ -352,6 +473,7 @@ def main():
              print(f" {fname:<40} | {v:>7} | {int(r):>5} ({rating})")
         print("-" * 70)
         print(" * 'High Density' (Text/Visual ratio < 300) -> Use PDF for better AI understanding.")
+
 
 if __name__ == "__main__":
     main()

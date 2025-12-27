@@ -7,7 +7,9 @@
 - **`office_to_notebooklm.py`**: コアとなる変換スクリプト。
     - **MarkItDown Engine**: Microsoft公式ライブラリによる高精度なテキスト変換。
     - **ZIP Support**: `.zip` ファイルを自動検知・解凍し、再帰的に処理。
-    - **AnyFile Support**: PDFはパススルー、テキストはヘッダ付与してMarkdown化。
+    - **Smart Chunking & Merging**: 複数ファイルをNotebookLMの制限（約20万文字）に合わせて自動結合・分割。
+    - **Universal Loader**: 拡張子を問わずテキストファイルを自動検知して取り込み。
+    - **PDF Pass-through**: PDFはそのままコピーし、コンテキスト情報をファイル名に保持。
     - **Visual Report**: 自作ロジックで画像密度を計算し、PDF利用を推奨。
     - **Hybrid Architecture**: 「変換」はMarkItDown、「判断」は自作ロジックのハイブリッド。
 - **ファイル名の日本語化**: ZIP内のShift-JISエンコードされたファイル名（例: `座学...md`）も、文字化けすることなく正しく復元されることを確認。

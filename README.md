@@ -4,10 +4,10 @@ Microsoft Officeファイル（Word, Excel, PowerPoint）を、NotebookLMでの�
 **Microsoft公式の変換エンジン `MarkItDown`** を採用し、高い変換精度を実現しています。また、独自の「視覚要素検知レポート」により、NotebookLMに登録するべきファイル形式（Markdown vs PDF）の判断を支援します。
 
 ## 主な機能
-1.  **高精度Markdown変換**: Microsoft MarkItDownを使用し、Officeファイルの構造を正確にテキスト化。コンテキスト情報も保持します。
-2.  **全ファイル対応 (AnyFile)**: PDFはそのままコピー、テキストファイルはメタデータを付与して取り込み、フォルダ全体をNotebookLM用に整備します。
-3.  **視覚要素レポート**: 画像やグラフの多さを自動検知し、「このファイルはPDFでアップロードすべき」とアドバイス。
-4.  **PDF/Markdownの使い分け支援**: テキスト中心なら本ツール、図解中心ならPDF、という最適な運用を提案。
+1.  **Smart Chunking (自動分割結合)**: フォルダ内の大量のファイルを、NotebookLMが読みやすいサイズ（約20万文字）ごとに自動で結合・分割して `Merged_Files_VolXX.md` にまとめます。数千ファイルあってもドラッグ＆ドロップ数回で済みます。
+2.  **All-in-One Loader**: Officeファイル、PDF、ソースコード、テキストなど、フォルダ内のあらゆる可読データを自動検知して取り込みます。
+3.  **高精度Markdown変換**: Microsoft MarkItDownを使用し、Officeファイルの構造を正確にテキスト化。
+4.  **視覚要素レポート**: 画像やグラフの多さを自動検知し、「このファイルはPDFでアップロードすべき」とアドバイス。
 
 ## 必要要件
 - Python 3.10以上
