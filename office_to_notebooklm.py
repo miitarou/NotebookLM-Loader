@@ -119,6 +119,38 @@ def get_output_filename(root_path, file_path):
         # root_path外にある場合（稀だが一応）
         return file_path.stem + ".md"
 
+
+def extract_zip_with_encoding(zip_path, extract_to):
+    """
+    ZIPファイルを解凍する際、Windows等で作成されたShift-JISのファイル名を
+    正しく復元して展開する。
+    """
+    with zipfile.ZipFile(zip_path, 'r') as z:
+        for file_info in z.infolist():
+            filename = file_info.filename
+            
+            # UTF-8フラグが立っていない場合、エンコーディングの補正を試みる
+            if file_info.flag_bits & 0x800 == 0:
+                try:
+                    # Windows (Japanese) ZIP is often CP932 encoded but marked as CP437
+                    filename = filename.encode('cp437').decode('cp932')
+                except:
+                    pass
+            
+            # ターゲットパスの生成
+            target_path = Path(extract_to) / filename
+            
+            # ディレクトリトラバーサル対策
+            if not os.path.abspath(target_path).startswith(os.path.abspath(extract_to)):
+                continue
+                
+            if file_info.is_dir():
+                target_path.mkdir(parents=True, exist_ok=True)
+            else:
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                with z.open(file_info) as source, open(target_path, "wb") as target:
+                    shutil.copyfileobj(source, target)
+
 def process_directory(current_path, root_path, output_dir, args, report_items, converted_files_content, processed_zips=None):
     """
     ディレクトリを再帰的に処理する関数
@@ -135,8 +167,9 @@ def process_directory(current_path, root_path, output_dir, args, report_items, c
         print(f"Extracting ZIP: {current_path.name} ...")
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
-                with zipfile.ZipFile(current_path, 'r') as zip_ref:
-                    zip_ref.extractall(temp_dir)
+                # Custom extraction to handle encoding
+                extract_zip_with_encoding(current_path, temp_dir)
+                
                 # ZIPの中身を処理するとき、root_pathはその一時フォルダにする（ZIP内構造を維持するため）
                 process_directory(Path(temp_dir), Path(temp_dir), output_dir, args, report_items, converted_files_content, processed_zips)
         except Exception as e:
@@ -158,8 +191,9 @@ def process_directory(current_path, root_path, output_dir, args, report_items, c
                     print(f"Extracting nested ZIP: {file} ...")
                     try:
                         with tempfile.TemporaryDirectory() as temp_dir:
-                            with zipfile.ZipFile(file_path, 'r') as zip_ref:
-                                zip_ref.extractall(temp_dir)
+                            # Custom extraction to handle encoding
+                            extract_zip_with_encoding(file_path, temp_dir)
+                            
                             # Nested ZIPもその内部構造を維持する
                             process_directory(Path(temp_dir), Path(temp_dir), output_dir, args, report_items, converted_files_content, processed_zips)
                     except Exception as e:
