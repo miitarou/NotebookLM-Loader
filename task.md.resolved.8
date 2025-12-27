@@ -1,0 +1,28 @@
+# NotebookLM用 Officeファイル一括変換ツール開発
+
+## 準備・設計
+- [x] 変換ツールの要件定義と設計 (Markdown形式の採用)
+- [x] 必要なPythonライブラリの選定 (`python-docx`, `openpyxl`, `python-pptx` 等)
+
+## 実装フェーズ
+- [x] 基本的なフォルダ走査・ファイル種別判定ロジックの実装
+- [x] **Word (.docx)** 変換機能の実装 (見出し・本文のMarkdown化 + 画像プレースホルダー)
+- [x] **Excel (.xlsx)** 変換機能の実装 (Markdown表ではなくCSV形式に変更)
+- [x] **PowerPoint (.pptx)** 変換機能の実装 (スライドごとのテキスト抽出 + 画像プレースホルダー)
+## 実装フェーズ
+- [x] 基本的なフォルダ走査・ファイル種別判定ロジックの実装
+- [x] **Word (.docx)** 変換機能の実装 (見出し・本文のMarkdown化 + 画像プレースホルダー)
+- [x] **Excel (.xlsx)** 変換機能の実装 (Markdown表ではなくCSV形式に変更)
+- [x] **PowerPoint (.pptx)** 変換機能の実装 (スライドごとのテキスト抽出 + 画像プレースホルダー)
+- [x] **結合機能**の実装 (複数ファイルを1つのテキストにまとめる機能)
+- [x] **PPTスキップ機能**の実装 (PDF利用推奨のため)
+- [x] **視覚要素検知・レポート機能**の実装 (画像・グラフ数をカウントし、テキストとの比率(密度)でPDF利用を推奨するサマリー表示)
+
+## アップグレードフェーズ (MarkItDown導入)
+- [/] **MarkItDownライブラリの採用**: [requirements.txt](file:///Users/miitarou/.gemini/antigravity/brain/c9f679ed-ddb6-46b5-961a-7e796abc6428/requirements.txt) の更新
+- [/] **変換ロジックの載せ替え**: [office_to_notebooklm.py](file:///Users/miitarou/.gemini/antigravity/brain/c9f679ed-ddb6-46b5-961a-7e796abc6428/office_to_notebooklm.py) の自作パーサーを `MarkItDown` APIに置き換え
+- [/] **ハイブリッド機能の維持**: 「視覚要素検知・レポート」機能は自作ロジックを残し、変換処理だけを委譲する実装
+
+## 検証・仕上げ
+- [ ] サンプルファイルを用いた変換テスト (MarkItDownでの動作確認)
+- [ ] ユーザーへの使用方法ガイド (README) 更新
