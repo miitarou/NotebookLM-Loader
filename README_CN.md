@@ -9,7 +9,7 @@
 ## 主要功能
 
 1.  **智能分块 (Smart Chunking - Merged Output)**:
-    *   自动将转换后的文本文件合并为较大的 **`Merged_Files_VolXX.md`** 文件（每个约 200,000 字符）。
+    *   自动将转换后的文本文件合并为较大的 **`Merged_Files_VolXX.md`** 文件（每个约 500,000 字符）。
     *   这些合并文件以及自动转换的 PDF 都将输出到 **`converted_files_merged` 文件夹** 中。
     *   用户只需将该文件夹的内容拖放到 NotebookLM 中即可。
     *   递归分割确保没有单个文件超过 Token 限制。
@@ -68,7 +68,7 @@ python office_to_notebooklm.py /path/to/archive.zip --merge
 
 - `--merge`: **（推荐：智能模式）**
     - 除了普通模式（`converted_files` 中的一对一输出）外，还会生成 **`converted_files_merged` 文件夹**。
-    - 该文件夹包含针对 Token 限制（200k 字符）优化的合并文件和自动转换的 PDF 文件。上传到 NotebookLM 时请使用此文件夹。
+    - 该文件夹包含针对 Token 限制（500k 字符）优化的合并文件和自动转换的 PDF 文件。上传到 NotebookLM 时请使用此文件夹。
 - `--skip-ppt`:
     - 将 PowerPoint (.pptx) 文件**从数据集中完全排除**。
     - 指定此选项后，将不会执行 Markdown 转换或 PDF 转换。仅在您有意忽略 PowerPoint 文件时使用此选项。

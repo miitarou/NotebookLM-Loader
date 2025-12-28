@@ -10,7 +10,7 @@ It utilizes **Microsoft's official `MarkItDown`** conversion engine for high-fid
 ## Key Features
 
 1.  **Smart Chunking (Merged Output)**:
-    *   Automatically merges converted text files into larger **`Merged_Files_VolXX.md`** files (approx. 200,000 chars each).
+    *   Automatically merges converted text files into larger **`Merged_Files_VolXX.md`** files (approx. 500,000 chars each).
     *   These merged files, along with auto-converted PDFs, are output to the **`converted_files_merged` folder**.
     *   Users just need to drag and drop the contents of this folder into NotebookLM.
     *   Recursive splitting ensures no single file exceeds the token limit.
@@ -69,7 +69,7 @@ The output in `converted_files_merged` will contain:
 
 - `--merge`: **(Recommended: Smart Mode)**
     - In addition to standard 1-to-1 conversion (`converted_files`), generating a **`converted_files_merged` folder**.
-    - This folder contains optimized "Volume" files (under 200k chars) and auto-converted PDFs. Use this folder for uploading to NotebookLM.
+    - This folder contains optimized "Volume" files (under 500k chars) and auto-converted PDFs. Use this folder for uploading to NotebookLM.
 - `--skip-ppt`:
     - **Excludes** PowerPoint (.pptx) files from the dataset entirely.
     - These files will not be converted to Markdown nor PDF. Use this only if you intentionally want to ignore PowerPoint files.
