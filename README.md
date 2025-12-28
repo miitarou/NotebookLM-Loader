@@ -9,9 +9,9 @@ Microsoft Officeファイル（Word, Excel, PowerPoint）を、NotebookLMでの�
 ## 主な機能
 
 1.  **Smart Chunking (自動分割結合)**:
-    *   フォルダ内の大量のファイルを、NotebookLMが読みやすいサイズ（約50万文字）ごとに自動で結合・分割して **`Merged_Files_VolXX.md`** にまとめます。
-    *   これらの結合ファイルと、後述する自動変換PDFは **`converted_files_merged` フォルダ** に出力されます。
-    *   ユーザーはこのフォルダの中身をNotebookLMにドラッグ＆ドロップするだけで完了します。
+    *   フォルダ内の大量のファイルを、NotebookLMが読みやすいサイズ（約40MB / 1200万文字）ごとに自動で結合・分割して **`Merged_Files_VolXX.- `--merge`: **（推奨・スマートモード）**
+    - 通常モード（`converted_files` への1ファイル1出力）に加え、**`converted_files_merged` フォルダ**を生成します。
+    - ここには、ファイルサイズ制限（40MB）に合わせて最適化・結合されたファイルと、自動PDF化されたファイルが格納されます。NotebookLMへのアップロードはこのフォルダを使うのが最適です。
 2.  **All-in-One Loader**: Officeファイル、PDF、ソースコード、テキストなど、フォルダ内のあらゆる可読データを自動検知して取り込みます。
 3.  **Auto-Switch to PDF (自動PDF化)**: 画像やグラフが多いファイル（High Density）を検知すると、**自動的にPDFに変換**して出力します（LibreOfficeを使用）。これにより、NotebookLMへ登録するために手動でPDF化する作業が不要になります。
 4.  **高精度Markdown変換**: Microsoft MarkItDownを使用し、リストや表などの構造を正確にテキスト化します。

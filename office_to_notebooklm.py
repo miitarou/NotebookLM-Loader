@@ -198,7 +198,7 @@ def extract_zip_with_encoding(zip_path, extract_to):
 # Feature: Smart Chunking & Merged Output
 # ---------------------------------------------------------
 
-MAX_CHARS_PER_VOLUME = 500000  # NotebookLM source limit (approx 500k words/tokens)
+MAX_CHARS_PER_VOLUME = 12000000  # Approx 40MB limit (Safe for UTF-8 Japanese)
 
 class MergedOutputManager:
     def __init__(self, output_dir):
