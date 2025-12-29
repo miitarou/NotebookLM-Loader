@@ -92,13 +92,25 @@ class MergedOutputManager:
                         split_pos += 2  # カンマと改行の次から
                 
                 if split_pos == -1:
+                    # TSV（タブ区切り）のレコード境界を探す
+                    split_pos = remaining.rfind('\t\n', 0, available_space)
+                    if split_pos != -1:
+                        split_pos += 2  # タブと改行の次から
+                
+                if split_pos == -1:
                     # カンマ+改行もない場合、カンマのみを探す
                     split_pos = remaining.rfind(',', 0, available_space)
                     if split_pos != -1:
                         split_pos += 1  # カンマの次から
                 
                 if split_pos == -1:
-                    # カンマも見つからない場合、スペースで分割
+                    # タブのみを探す（TSV対応）
+                    split_pos = remaining.rfind('\t', 0, available_space)
+                    if split_pos != -1:
+                        split_pos += 1  # タブの次から
+                
+                if split_pos == -1:
+                    # カンマ・タブも見つからない場合、スペースで分割
                     split_pos = remaining.rfind(' ', 0, available_space)
                     if split_pos != -1:
                         split_pos += 1
