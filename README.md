@@ -3,61 +3,116 @@
 [ [English](README_EN.md) | **日本語** | [中文](README_CN.md) ]
 
 
-Microsoft Officeファイル（Word, Excel, PowerPoint）を、NotebookLMでの利用に最適化されたMarkdown形式に一括変換するPythonツールです。
-**Microsoft公式の変換エンジン `MarkItDown`** を採用し、高い変換精度を実現しています。また、独自の「視覚要素検知レポート」により、NotebookLMに登録するべきファイル形式（Markdown vs PDF）の判断を支援します。
+Microsoft Officeファイル（Word, Excel, PowerPoint）をはじめ、**多種多様なファイル形式**をNotebookLMでの利用に最適化された形式に一括変換するPythonツールです。
+**Microsoft公式の変換エンジン `MarkItDown`** を採用し、高い変換精度を実現しています。
 
 ## 主な機能
 
-1.  **Smart Chunking (自動分割結合)**:
-    *   フォルダ内の大量のファイルを、NotebookLMが読みやすいサイズ（約40MB / 1200万文字）ごとに自動で結合・分割して **`Merged_Files_VolXX.- `--merge`: **（推奨・スマートモード）**
-    - 通常モード（`converted_files` への1ファイル1出力）に加え、**`converted_files_merged` フォルダ**を生成します。
-    - ここには、ファイルサイズ制限（40MB）に合わせて最適化・結合されたファイルと、自動PDF化されたファイルが格納されます。NotebookLMへのアップロードはこのフォルダを使うのが最適です。
-2.  **All-in-One Loader**: Officeファイル、PDF、ソースコード、テキストなど、フォルダ内のあらゆる可読データを自動検知して取り込みます。
-3.  **Auto-Switch to PDF (自動PDF化)**: 画像やグラフが多いファイル（High Density）を検知すると、**自動的にPDFに変換**して出力します（LibreOfficeを使用）。これにより、NotebookLMへ登録するために手動でPDF化する作業が不要になります。
-4.  **高精度Markdown変換**: Microsoft MarkItDownを使用し、リストや表などの構造を正確にテキスト化します。
+### 1. Smart Chunking (自動分割結合)
+- フォルダ内の大量のファイルを、NotebookLMが読みやすいサイズ（約35MB）ごとに自動で結合・分割
+- `--merge` オプションで `converted_files_merged` フォルダに最適化されたファイルを生成
+
+### 2. All-in-One Loader
+対応するファイル形式を自動検知して取り込み：
+
+| カテゴリ | 対応形式 |
+|----------|----------|
+| **Office (新形式)** | .docx, .xlsx, .pptx |
+| **Office (旧形式)** | .doc, .xls, .ppt |
+| **MarkItDown対応** | .rtf, .epub, .msg, .eml |
+| **PDF** | .pdf (そのままコピー) |
+| **Visio** | .vsdx, .vsd → PDF変換 |
+| **画像** | .png, .jpg, .gif, .bmp, .tiff, .webp → PDF変換 |
+| **テキスト** | .txt, .md, .py, .js, .html, .css, .json, .yaml, .xml, .csv, .log, .ini, .toml 等 |
+| **圧縮ファイル** | .zip, .7z, .rar, .tar.gz, .tgz, .lzh |
+
+### 3. Auto-Switch to PDF (自動PDF化)
+- 画像やグラフが多いファイル（High Density）を検知すると、自動的にPDFに変換
+- LibreOfficeを使用
+
+### 4. 堅牢なファイル処理
+- **MIMEタイプ判定**: 拡張子ではなくファイルの中身で判定
+- **エンコーディング自動検出**: Shift-JIS、EUC-JP等も自動対応
+- **巨大ファイルスキップ**: 100MB超のファイルは自動スキップ
+- **シンボリックリンク無視**: 循環参照を防止
+- **パスワード保護検出**: 暗号化ファイルを検出してレポート
+
+### 5. スキップ対象
+以下のファイルは処理対象外（自動スキップ）：
+- OneNote (.one)
+- Access (.accdb, .mdb)
+- 動画/音声 (.mp4, .mp3, .wav 等)
+- CAD (.dwg, .dxf)
+- 実行ファイル (.exe, .dll)
 
 ## 必要要件
-## 必要要件
+
 - Python 3.10以上
 - **LibreOffice** (自動PDF化機能を利用する場合に必須)
-    - **バージョン 7.0 以上** 推奨（Headlessモードが安定しているため）
-    - Mac: `/Applications/LibreOffice.app` にインストールされていること
+    - バージョン 7.0 以上推奨
+    - Mac: `/Applications/LibreOffice.app` にインストール
     - Linux/Windows: `soffice` コマンドにパスが通っていること
-- 必要なライブラリ: `markitdown`, `python-docx`, `openpyxl`, `python-pptx`, `pandas`
-  - `pip install -r requirements.txt` でインストール可能
 
 ## インストール
-1. リポジトリをダウンロード
-2. 依存ライブラリをインストール:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## 使い方 (Usage)
-
-変換したいOfficeファイルが入った**フォルダ**、または **ZIPファイル** を指定して実行します。
-
-### フォルダを指定する場合
-```bash
-python office_to_notebooklm.py /Users/yourname/Documents/MyProject
-```
-
-### ZIPファイルを直接指定する場合
-ZIPファイルを自動で一時フォルダに展開し、中身を変換・解析します。
-```bash
-python office_to_notebooklm.py /Users/yourname/Documents/archive.zip
-```
-
-### オプション
-- `--merge`: `converted_files_merged` フォルダを作成し、スマート結合されたファイルを生成します。
-- `--skip-ppt`: PowerPoint (.pptx) の変換をスキップします（PPTはPDF利用を推奨するため）。
 
 ```bash
-python office_to_notebooklm.py /target/dir --merge --skip-ppt
+git clone https://github.com/miitarou/NotebookLM-Loader.git
+cd NotebookLM-Loader
+pip install -r requirements.txt
 ```
 
-## 注意事項 - 変換の仕様について
-- **MarkItDown Engine:** Microsoft公式の強力なパーサーを使用するため、表やリストなどの構造認識精度が高いです。変換されたテキストは、NotebookLMが文脈を理解するのに最適です。
-- **視覚要素レポート (Visual Density):**
-    - 実行後に表示されるレポートです。各ファイルが「テキスト（Markdown）」として処理されたか、「画像主体（PDF）」として処理されたかを確認できます。
-    - 「High Visual Density」と判定されたファイルは、**自動でPDFに変換され出力されています**。ユーザーによる追加の手順は不要です。
+### 追加依存（オプション機能用）
+
+| ライブラリ | 用途 |
+|------------|------|
+| `py7zr` | 7z形式の展開 |
+| `rarfile` | RAR形式の展開（unrarコマンドも必要） |
+| `lhafile` | LZH形式の展開 |
+| `python-magic-bin` | MIMEタイプ判定 |
+| `Pillow` | 画像→PDF変換 |
+
+## 使い方
+
+### 基本
+```bash
+python office_to_notebooklm.py /path/to/folder
+```
+
+### ZIPファイルを直接指定
+```bash
+python office_to_notebooklm.py /path/to/archive.zip
+```
+
+### 推奨オプション（スマート結合モード）
+```bash
+python office_to_notebooklm.py /path/to/folder --merge
+```
+
+### オプション一覧
+| オプション | 説明 |
+|------------|------|
+| `--merge` | スマート結合モード（推奨） |
+| `--skip-ppt` | PowerPointをスキップ |
+
+## 出力
+
+### ディレクトリ構造
+```
+target_folder/
+├── converted_files/           # 個別変換ファイル
+│   ├── document.md
+│   ├── spreadsheet.md
+│   └── presentation.pdf
+└── converted_files_merged/    # --merge時のみ生成
+    ├── Merged_Files_Vol01.md  # 結合ファイル
+    ├── Merged_Files_Vol02.md
+    └── image.pdf              # PDF類
+```
+
+### 実行後レポート
+- **Visual Density Report**: 各ファイルの処理結果（Markdown/PDF）
+- **Password Protected Files**: パスワード保護で処理できなかったファイル一覧
+
+## ライセンス
+
+MIT License
