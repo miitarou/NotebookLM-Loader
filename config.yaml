@@ -7,7 +7,7 @@
 processing:
   max_file_size_mb: 100          # スキップする最大ファイルサイズ（MB）
   merge_volume_mb: 35            # マージボリュームの最大サイズ（MB）
-  visual_density_threshold: 300  # 視覚密度判定の閾値
+  visual_density_threshold: 300  # 画像1枚あたりの文字数がこの値未満で「画像多め」と判定しPDF変換
 
 # スキップ対象の拡張子
 skip_extensions:

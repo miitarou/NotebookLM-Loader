@@ -24,7 +24,7 @@ from .processors import is_text_file, is_likely_text_by_mime
 
 # 定数
 OUTPUT_DIR_NAME = "converted_files"
-TEXT_PER_VISUAL_THRESHOLD = 300
+
 
 
 def process_directory(
@@ -204,7 +204,7 @@ def _process_single_file(
     # 視覚密度チェック（新形式Office）
     if ext in config.office_extensions_new:
         ratio = char_count / vis_count if vis_count > 0 else 9999
-        is_dense_visual = ratio < TEXT_PER_VISUAL_THRESHOLD
+        is_dense_visual = ratio < config.visual_density_threshold
         if is_dense_visual or vis_count >= 5:
             logger.info(f"  [Auto-Switch] High density detected (Visuals: {vis_count}). Converting to PDF...")
             target_pdf_name = get_output_filename(root_path, file_path, extension=".pdf")
@@ -503,7 +503,7 @@ def run() -> int:
         logger.info(f" {'Filename':<40} | {'Visuals':<7} | {'Density':<7} | {'Status'}")
         logger.info("-" * 90)
         for (fname, v, c, r, status) in report_items:
-            rating = "High" if r < TEXT_PER_VISUAL_THRESHOLD else "Low"
+            rating = "High" if r < config.visual_density_threshold else "Low"
             logger.info(f" {fname:<40} | {v:>7} | {int(r):>5} ({rating}) | {status}")
         logger.info("-" * 90)
     
