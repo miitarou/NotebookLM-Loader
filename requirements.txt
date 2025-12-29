@@ -9,3 +9,5 @@ rarfile
 lhafile
 python-magic-bin
 Pillow
+tqdm
+pyyaml

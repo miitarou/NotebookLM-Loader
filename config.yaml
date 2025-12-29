@@ -1,0 +1,52 @@
+# NotebookLM Loader 設定ファイル
+# 
+# 使用方法:
+#   python office_to_notebooklm.py /path/to/folder --config config.yaml
+
+# 処理設定
+processing:
+  max_file_size_mb: 100          # スキップする最大ファイルサイズ（MB）
+  merge_volume_mb: 35            # マージボリュームの最大サイズ（MB）
+  visual_density_threshold: 300  # 視覚密度判定の閾値
+
+# スキップ対象の拡張子
+skip_extensions:
+  # OneNote
+  - .one
+  - .onetoc2
+  # Access
+  - .accdb
+  - .mdb
+  # 動画
+  - .mp4
+  - .avi
+  - .mov
+  - .wmv
+  - .mkv
+  - .flv
+  - .webm
+  # 音声
+  - .mp3
+  - .wav
+  - .aac
+  - .flac
+  - .ogg
+  - .wma
+  - .m4a
+  # CAD
+  - .dwg
+  - .dxf
+  # 実行ファイル
+  - .exe
+  - .dll
+  - .so
+  - .dylib
+  # その他バイナリ
+  - .bin
+  - .dat
+  - .iso
+  - .img
+
+# ログ設定
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR
