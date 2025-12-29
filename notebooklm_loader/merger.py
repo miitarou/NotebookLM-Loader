@@ -84,16 +84,28 @@ class MergedOutputManager:
                 split_pos = remaining.rfind('\n', 0, available_space)
                 
                 if split_pos == -1:
-                    # 改行が見つからない場合（非常に長い1行）
-                    # スペースで分割を試みる
-                    split_pos = remaining.rfind(' ', 0, available_space)
+                    # 改行が見つからない場合、CSVのレコード境界（カンマ+改行相当）を探す
+                    # CSV形式では各フィールドがカンマで区切られているため、
+                    # カンマの後で分割すればレコードの途中で切れにくい
+                    split_pos = remaining.rfind(',\n', 0, available_space)
+                    if split_pos != -1:
+                        split_pos += 2  # カンマと改行の次から
                 
                 if split_pos == -1:
-                    # スペースも見つからない場合は、そのまま分割（最終手段）
+                    # カンマ+改行もない場合、カンマのみを探す
+                    split_pos = remaining.rfind(',', 0, available_space)
+                    if split_pos != -1:
+                        split_pos += 1  # カンマの次から
+                
+                if split_pos == -1:
+                    # カンマも見つからない場合、スペースで分割
+                    split_pos = remaining.rfind(' ', 0, available_space)
+                    if split_pos != -1:
+                        split_pos += 1
+                
+                if split_pos == -1 or split_pos == 0:
+                    # どれも見つからない場合は、そのまま分割（最終手段）
                     split_pos = available_space
-                else:
-                    # 改行またはスペースの次の文字から新しいチャンクを開始
-                    split_pos += 1
                 
                 c_chunk = remaining[:split_pos]
                 remaining = remaining[split_pos:]
