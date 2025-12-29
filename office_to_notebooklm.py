@@ -15,6 +15,11 @@ import re
 import subprocess
 import chardet
 import tarfile
+import logging
+import json
+from typing import Optional, Dict, List, Any
+from dataclasses import dataclass, field, asdict
+
 try:
     import py7zr
     HAS_7Z = True
@@ -42,8 +47,109 @@ except ImportError:
 try:
     import magic
     HAS_MAGIC = True
+    # MIMEタイプ判定用インスタンス（再利用）
+    _mime_detector = magic.Magic(mime=True)
 except ImportError:
     HAS_MAGIC = False
+    _mime_detector = None
+
+
+# ---------------------------------------------------------
+# Logging Setup
+# ---------------------------------------------------------
+
+def setup_logging(output_dir: Path, verbose: bool = False) -> logging.Logger:
+    """
+    ログ機構をセットアップする
+    
+    Args:
+        output_dir: 出力ディレクトリ（ログファイル出力先）
+        verbose: 詳細ログ出力フラグ
+        
+    Returns:
+        設定済みのロガー
+    """
+    log_level = logging.DEBUG if verbose else logging.INFO
+    
+    # ログディレクトリ作成
+    log_dir = output_dir / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    
+    # ログファイル名（タイムスタンプ付き）
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_file = log_dir / f"processing_{timestamp}.log"
+    
+    # ロガー設定
+    logger = logging.getLogger("notebooklm_loader")
+    logger.setLevel(log_level)
+    
+    # 既存ハンドラをクリア
+    logger.handlers.clear()
+    
+    # ファイルハンドラ
+    file_handler = logging.FileHandler(log_file, encoding='utf-8')
+    file_handler.setLevel(logging.DEBUG)
+    file_format = logging.Formatter('%(asctime)s | %(levelname)-8s | %(message)s')
+    file_handler.setFormatter(file_format)
+    logger.addHandler(file_handler)
+    
+    # コンソールハンドラ
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(log_level)
+    console_format = logging.Formatter('%(message)s')
+    console_handler.setFormatter(console_format)
+    logger.addHandler(console_handler)
+    
+    logger.info(f"Log file: {log_file}")
+    return logger
+
+
+# ---------------------------------------------------------
+# Processing Summary
+# ---------------------------------------------------------
+
+@dataclass
+class FileResult:
+    """個別ファイルの処理結果"""
+    path: str
+    status: str  # converted, skipped, error, password_protected
+    output: Optional[str] = None
+    error_message: Optional[str] = None
+    file_type: Optional[str] = None
+
+
+@dataclass
+class ProcessingSummary:
+    """処理サマリー"""
+    run_time: str = field(default_factory=lambda: datetime.datetime.now().isoformat())
+    target_path: str = ""
+    total_files: int = 0
+    processed: int = 0
+    skipped: int = 0
+    errors: int = 0
+    password_protected: int = 0
+    files: List[Dict[str, Any]] = field(default_factory=list)
+    
+    def add_result(self, result: FileResult):
+        """処理結果を追加"""
+        self.files.append(asdict(result))
+        self.total_files += 1
+        
+        if result.status == "converted":
+            self.processed += 1
+        elif result.status == "skipped":
+            self.skipped += 1
+        elif result.status == "error":
+            self.errors += 1
+        elif result.status == "password_protected":
+            self.password_protected += 1
+    
+    def save(self, output_dir: Path):
+        """サマリーをJSONファイルに保存"""
+        summary_file = output_dir / "processing_report.json"
+        with open(summary_file, 'w', encoding='utf-8') as f:
+            json.dump(asdict(self), f, ensure_ascii=False, indent=2)
+        return summary_file
 
 # ---------------------------------------------------------
 # PDF Conversion Utilities
@@ -166,13 +272,47 @@ TEXT_EXTENSIONS = {
 }
 
 def setup_args():
-    parser = argparse.ArgumentParser(description='Office files to Markdown converter for NotebookLM')
+    """
+    コマンドライン引数をパースする
+    
+    Returns:
+        パース済みの引数オブジェクト
+    """
+    parser = argparse.ArgumentParser(
+        description='Office files to Markdown converter for NotebookLM',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s /path/to/folder                    # 基本変換
+  %(prog)s /path/to/folder --merge            # スマート結合モード
+  %(prog)s /path/to/folder --merge --verbose  # 詳細ログ出力
+  %(prog)s /path/to/folder --dry-run          # 実行計画のみ表示
+        """
+    )
     parser.add_argument('target_dir', help='Target directory containing Office files or ZIP file')
-    parser.add_argument('--merge', action='store_true', help='Also create merged output in converted_files_merged directory')
-    parser.add_argument('--skip-ppt', action='store_true', help='Skip PowerPoint files (recommend using PDF for visual-heavy PPTs)')
+    parser.add_argument('--merge', action='store_true', 
+                        help='Also create merged output in converted_files_merged directory')
+    parser.add_argument('--skip-ppt', action='store_true', 
+                        help='Skip PowerPoint files (recommend using PDF for visual-heavy PPTs)')
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help='Enable verbose logging (DEBUG level)')
+    parser.add_argument('-q', '--quiet', action='store_true',
+                        help='Suppress console output (only log to file)')
+    parser.add_argument('--dry-run', action='store_true',
+                        help='Show what would be processed without actually converting')
     return parser.parse_args()
 
 def analyze_docx(file_path):
+    """
+    Wordファイルの視覚要素と文字数を分析する
+    
+    Args:
+        file_path: 対象ファイルのパス
+        
+    Returns:
+        (visual_count, char_count): 視覚要素数と文字数のタプル
+    """
+    logger = logging.getLogger("notebooklm_loader")
     try:
         doc = docx.Document(file_path)
         visual_count = 0
@@ -184,10 +324,21 @@ def analyze_docx(file_path):
                 if run.element.xpath('.//a:blip'):
                      visual_count += 1
         return visual_count, char_count
-    except:
+    except Exception as e:
+        logger.debug(f"analyze_docx error for {file_path}: {e}")
         return 0, 0
 
 def analyze_xlsx(file_path):
+    """
+    Excelファイルの視覚要素と文字数を分析する
+    
+    Args:
+        file_path: 対象ファイルのパス
+        
+    Returns:
+        (visual_count, char_count): 視覚要素数と文字数のタプル
+    """
+    logger = logging.getLogger("notebooklm_loader")
     try:
         visual_count = 0
         char_count = 0
@@ -197,8 +348,8 @@ def analyze_xlsx(file_path):
                 sheet = wb_obj[sheet_name]
                 if hasattr(sheet, '_charts') and sheet._charts:
                     visual_count += len(sheet._charts)
-        except:
-            pass 
+        except Exception as e:
+            logger.debug(f"analyze_xlsx chart detection error: {e}")
         wb = openpyxl.load_workbook(file_path, data_only=True)
         for sheet_name in wb.sheetnames:
             try:
@@ -206,13 +357,24 @@ def analyze_xlsx(file_path):
                 if not df.empty:
                     csv_text = df.to_csv(index=False)
                     char_count += len(csv_text)
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"analyze_xlsx sheet {sheet_name} error: {e}")
         return visual_count, char_count
-    except:
+    except Exception as e:
+        logger.debug(f"analyze_xlsx error for {file_path}: {e}")
         return 0, 0
 
 def analyze_pptx(file_path):
+    """
+    PowerPointファイルの視覚要素と文字数を分析する
+    
+    Args:
+        file_path: 対象ファイルのパス
+        
+    Returns:
+        (visual_count, char_count): 視覚要素数と文字数のタプル
+    """
+    logger = logging.getLogger("notebooklm_loader")
     try:
         prs = Presentation(file_path)
         visual_count = 0
@@ -232,7 +394,8 @@ def analyze_pptx(file_path):
                      if not shape.has_text_frame or not shape.text_frame.text.strip(): is_visual = True
                 if is_visual: visual_count += 1
         return visual_count, char_count
-    except:
+    except Exception as e:
+        logger.debug(f"analyze_pptx error for {file_path}: {e}")
         return 0, 0
 
 def convert_with_markitdown(file_path):
@@ -285,8 +448,8 @@ def extract_zip_with_encoding(zip_path, extract_to):
                     try:
                         # Windows (Japanese) ZIP is often CP932 encoded but marked as CP437
                         filename = filename.encode('cp437').decode('cp932')
-                    except:
-                        pass
+                    except (UnicodeDecodeError, UnicodeEncodeError):
+                        pass  # エンコーディング変換失敗は元のファイル名を使用
                 
                 # ターゲットパスの生成
                 target_path = Path(extract_to) / filename
@@ -348,7 +511,17 @@ def extract_rar(archive_path, extract_to):
 
 
 def extract_tar(archive_path, extract_to):
-    """tar/tar.gz/tgzファイルを展開"""
+    """
+    tar/tar.gz/tgzファイルを展開
+    
+    Args:
+        archive_path: 圧縮ファイルのパス
+        extract_to: 展開先ディレクトリ
+        
+    Returns:
+        処理結果（"OK", "ERROR"等）
+    """
+    import sys
     try:
         with tarfile.open(archive_path, 'r:*') as tf:
             # ディレクトリトラバーサル対策
@@ -356,7 +529,11 @@ def extract_tar(archive_path, extract_to):
                 member_path = os.path.join(extract_to, member.name)
                 if not os.path.abspath(member_path).startswith(os.path.abspath(extract_to)):
                     continue
-                tf.extract(member, extract_to)
+                # Python 3.12+ではfilter引数が必要
+                if sys.version_info >= (3, 12):
+                    tf.extract(member, extract_to, filter='data')
+                else:
+                    tf.extract(member, extract_to)
         return "OK"
     except Exception as e:
         print(f"    [TAR Extract Error] {e}")
@@ -387,13 +564,17 @@ def extract_lzh(archive_path, extract_to):
 def get_mime_type(file_path):
     """
     ファイルのMIMEタイプを取得する（python-magic使用）
-    ライブラリがない場合はNoneを返す
+    
+    Args:
+        file_path: 対象ファイルのパス
+        
+    Returns:
+        MIMEタイプ文字列、またはNone（ライブラリ未インストール時）
     """
-    if not HAS_MAGIC:
+    if not _mime_detector:
         return None
     try:
-        mime = magic.Magic(mime=True)
-        return mime.from_file(str(file_path))
+        return _mime_detector.from_file(str(file_path))
     except Exception:
         return None
 
@@ -631,8 +812,8 @@ def process_directory(current_path, root_path, output_dir, args, report_items, m
                     size_mb = file_size / (1024 * 1024)
                     print(f"[Skipped Large File] {file} ({size_mb:.1f}MB > 100MB)")
                     continue
-            except:
-                pass
+            except OSError:
+                pass  # ファイルサイズ取得失敗は無視
             
             ext = file_path.suffix.lower()
             
@@ -875,7 +1056,7 @@ def process_directory(current_path, root_path, output_dir, args, report_items, m
                 
                 try:
                     rel_path_str = str(file_path.relative_to(root_path))
-                except:
+                except ValueError:
                     rel_path_str = file if isinstance(file, str) else file.name
 
                 metadata_header = f"""# File Info
@@ -901,13 +1082,17 @@ def process_directory(current_path, root_path, output_dir, args, report_items, m
     return password_protected_files
 
 def main():
+    """
+    メインエントリーポイント
+    """
     args = setup_args()
     target_path = Path(args.target_dir)
     
     if not target_path.exists():
         print(f"Error: Path '{target_path}' not found.")
-        return
+        return 1
 
+    # 出力ディレクトリ設定
     if target_path.is_dir():
         output_dir = target_path / OUTPUT_DIR_NAME
         root_processing_path = target_path
@@ -917,7 +1102,27 @@ def main():
         
     output_dir.mkdir(exist_ok=True)
 
-    # Merged Output Setup (Only if --merge is specified)
+    # ログ設定
+    logger = setup_logging(output_dir, verbose=args.verbose)
+    
+    if args.quiet:
+        # コンソールハンドラを無効化
+        for handler in logger.handlers:
+            if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                handler.setLevel(logging.CRITICAL)
+    
+    # 処理サマリー初期化
+    summary = ProcessingSummary(target_path=str(target_path))
+    
+    # Dry-run モード
+    if args.dry_run:
+        logger.info("=== DRY-RUN MODE ===")
+        logger.info("Following files would be processed:")
+        # TODO: ファイル一覧を表示する処理を追加
+        logger.info("Dry-run complete. No files were actually processed.")
+        return 0
+
+    # Merged Output Setup
     merger = None
     if args.merge:
         if target_path.is_dir():
@@ -925,17 +1130,17 @@ def main():
         else:
             merged_dir = target_path.parent / (OUTPUT_DIR_NAME + "_merged")
         
-        print(f"\nTarget: {target_path}")
-        print(f"Output: {output_dir}")
-        print(f"Merged: {merged_dir}")
-        print("-" * 50)
+        logger.info(f"Target: {target_path}")
+        logger.info(f"Output: {output_dir}")
+        logger.info(f"Merged: {merged_dir}")
+        logger.info("-" * 50)
         
         merger = MergedOutputManager(merged_dir)
     else:
-        print(f"\nTarget: {target_path}")
-        print(f"Output: {output_dir}")
-        print("(Use --merge to create combined output)")
-        print("-" * 50)
+        logger.info(f"Target: {target_path}")
+        logger.info(f"Output: {output_dir}")
+        logger.info("(Use --merge to create combined output)")
+        logger.info("-" * 50)
     
     report_items = []
     password_protected_files = []
@@ -949,31 +1154,46 @@ def main():
     if merger:
         merger.finalize()
 
-    print("\n" + "="*60)
-    print(" COMPLETED")
-    print("="*60)
+    # サマリー保存
+    summary_file = summary.save(output_dir)
+
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info(" COMPLETED")
+    logger.info("=" * 60)
+    
+    # 統計サマリー
+    logger.info(f"\nProcessing Summary:")
+    logger.info(f"  Total files:        {summary.total_files}")
+    logger.info(f"  Processed:          {summary.processed}")
+    logger.info(f"  Skipped:            {summary.skipped}")
+    logger.info(f"  Errors:             {summary.errors}")
+    logger.info(f"  Password protected: {summary.password_protected}")
+    logger.info(f"\nReport saved to: {summary_file}")
     
     # パスワード保護ファイルレポート
     if password_protected_files:
-        print("\n[!] PASSWORD PROTECTED FILES (Could not process)")
-        print("-" * 60)
+        logger.warning("\n[!] PASSWORD PROTECTED FILES (Could not process)")
+        logger.warning("-" * 60)
         for pf in password_protected_files:
-            print(f"  - {pf}")
-        print("-" * 60)
-        print(f"  Total: {len(password_protected_files)} file(s)")
+            logger.warning(f"  - {pf}")
+        logger.warning("-" * 60)
+        logger.warning(f"  Total: {len(password_protected_files)} file(s)")
     
     if report_items:
-        print("\n[!] PROCESSED FILE REPORT (Visual Density)")
-        print(f" {'Filename':<40} | {'Visuals':<7} | {'Density':<7} | {'Status'}")
-        print("-" * 90)
+        logger.info("\n[!] PROCESSED FILE REPORT (Visual Density)")
+        logger.info(f" {'Filename':<40} | {'Visuals':<7} | {'Density':<7} | {'Status'}")
+        logger.info("-" * 90)
         for (fname, v, c, r, status) in report_items:
              rating = "High" if r < TEXT_PER_VISUAL_THRESHOLD else "Low"
-             print(f" {fname:<40} | {v:>7} | {int(r):>5} ({rating}) | {status}")
-        print("-" * 90)
-        print(" * 'Converted to PDF': High visual density -> Auto-converted to PDF via LibreOffice.")
-        print(" * 'Kept Original (PDF Fail)': PDF Conversion failed -> Copied original file.")
-
+             logger.info(f" {fname:<40} | {v:>7} | {int(r):>5} ({rating}) | {status}")
+        logger.info("-" * 90)
+        logger.info(" * 'Converted to PDF': High visual density -> Auto-converted to PDF via LibreOffice.")
+        logger.info(" * 'Kept Original (PDF Fail)': PDF Conversion failed -> Copied original file.")
+    
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    exit(main())
+
