@@ -4,6 +4,11 @@
 from pathlib import Path
 from typing import List
 
+from .logger import get_logger
+
+# 安全弁: 1ファイルあたりの最大分割数
+MAX_PARTS = 10000
+
 
 class MergedOutputManager:
     """
@@ -61,17 +66,18 @@ class MergedOutputManager:
         文字の途中で切断されないよう、改行位置で分割を行う。
         これによりマルチバイト文字（日本語など）が途中で切れることを防ぐ。
         """
+        logger = get_logger()
         remaining = content
         part_num = 1
         
-        while remaining:
+        while remaining and part_num <= MAX_PARTS:
             part_header = f"\n\n# {filename} (Part {part_num})\n\n"
             header_len = len(part_header)
             
             if self.current_char_count + header_len > self.max_chars_per_volume:
                  self._flush_volume()
             
-            available_space = self.max_chars_per_volume - self.current_char_count - header_len
+            available_space = max(1, self.max_chars_per_volume - self.current_char_count - header_len)
             
             if len(remaining) > available_space:
                 # 行単位で分割：available_space以内で最後の改行位置を探す
@@ -105,6 +111,9 @@ class MergedOutputManager:
                 self._flush_volume()
             
             part_num += 1
+        
+        if part_num > MAX_PARTS:
+            logger.warning(f"Max parts ({MAX_PARTS}) reached for {filename}. File may be truncated.")
 
     def _flush_volume(self):
         """現在のバッファをファイルに書き出す"""
@@ -118,12 +127,13 @@ class MergedOutputManager:
         index_text = "# Table of Contents\n" + "\n".join([f"- {name}" for name in self.file_index]) + "\n\n---\n\n"
         full_text = index_text + "\n".join(self.current_content)
         
+        logger = get_logger()
         try:
             with open(output_path, 'w', encoding='utf-8') as f:
                 f.write(full_text)
-            print(f"[Merged Created] {vol_filename} ({len(full_text)} chars)")
+            logger.info(f"[Merged Created] {vol_filename} ({len(full_text)} chars)")
         except Exception as e:
-            print(f"Error writing volume {vol_filename}: {e}")
+            logger.error(f"Error writing volume {vol_filename}: {e}")
 
         # リセット
         self.current_vol += 1
