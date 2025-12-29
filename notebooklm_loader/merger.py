@@ -84,33 +84,7 @@ class MergedOutputManager:
                 split_pos = remaining.rfind('\n', 0, available_space)
                 
                 if split_pos == -1:
-                    # 改行が見つからない場合、CSVのレコード境界（カンマ+改行相当）を探す
-                    # CSV形式では各フィールドがカンマで区切られているため、
-                    # カンマの後で分割すればレコードの途中で切れにくい
-                    split_pos = remaining.rfind(',\n', 0, available_space)
-                    if split_pos != -1:
-                        split_pos += 2  # カンマと改行の次から
-                
-                if split_pos == -1:
-                    # TSV（タブ区切り）のレコード境界を探す
-                    split_pos = remaining.rfind('\t\n', 0, available_space)
-                    if split_pos != -1:
-                        split_pos += 2  # タブと改行の次から
-                
-                if split_pos == -1:
-                    # カンマ+改行もない場合、カンマのみを探す
-                    split_pos = remaining.rfind(',', 0, available_space)
-                    if split_pos != -1:
-                        split_pos += 1  # カンマの次から
-                
-                if split_pos == -1:
-                    # タブのみを探す（TSV対応）
-                    split_pos = remaining.rfind('\t', 0, available_space)
-                    if split_pos != -1:
-                        split_pos += 1  # タブの次から
-                
-                if split_pos == -1:
-                    # カンマ・タブも見つからない場合、スペースで分割
+                    # 改行が見つからない場合、スペースで分割
                     split_pos = remaining.rfind(' ', 0, available_space)
                     if split_pos != -1:
                         split_pos += 1
