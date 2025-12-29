@@ -13,7 +13,7 @@ from .logger import setup_logging, get_logger
 from .summary import ProcessingSummary, FileResult
 from .merger import MergedOutputManager
 from .cli import setup_args
-from .utils import get_output_filename
+from .utils import get_output_filename, sanitize_content
 from .extractors import extract_zip_with_encoding, extract_7z, extract_rar, extract_tar, extract_lzh
 from .converters import (
     analyze_docx, analyze_xlsx, analyze_pptx, 
@@ -349,6 +349,8 @@ def _process_single_file(
         try:
             with open(file_path, 'r', encoding=detected_encoding, errors='replace') as f:
                 markdown_content = f.read()
+                # 不可視文字（ゼロ幅スペース等）を除去
+                markdown_content = sanitize_content(markdown_content)
                 if not markdown_content.strip():
                     markdown_content = "(Empty File)"
         except Exception as e:
