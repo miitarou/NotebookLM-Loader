@@ -7,7 +7,5 @@ chardet
 py7zr
 rarfile
 lhafile
-python-magic-bin
 Pillow
-tqdm
 pyyaml

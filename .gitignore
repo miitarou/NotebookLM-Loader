@@ -11,3 +11,5 @@ converted_files_merged/
 walkthrough.md
 task.md
 implementation_plan.md
+venv/
+.env
