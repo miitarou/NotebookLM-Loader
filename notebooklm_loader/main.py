@@ -110,16 +110,7 @@ def process_directory(
                 summary.add_result(FileResult(path=str(file_path), status="skipped", file_type="symlink"))
                 continue
             
-            # 巨大ファイルをスキップ
-            try:
-                file_size = file_path.stat().st_size
-                if file_size > config.max_file_size:
-                    size_mb = file_size / (1024 * 1024)
-                    logger.info(f"[Skipped Large File] {file} ({size_mb:.1f}MB > 100MB)")
-                    summary.add_result(FileResult(path=str(file_path), status="skipped", file_type="large"))
-                    continue
-            except OSError:
-                pass
+            # 注: 巨大ファイルはテキストならmergerで自動分割、バイナリならMIME判定でスキップ
             
             ext = file_path.suffix.lower()
             
