@@ -55,7 +55,12 @@ class MergedOutputManager:
         self.file_index.append(filename)
 
     def _handle_huge_file(self, filename: str, content: str):
-        """巨大ファイルを分割して登録する"""
+        """
+        巨大ファイルを行単位で分割して登録する
+        
+        文字の途中で切断されないよう、改行位置で分割を行う。
+        これによりマルチバイト文字（日本語など）が途中で切れることを防ぐ。
+        """
         remaining = content
         part_num = 1
         
@@ -69,8 +74,23 @@ class MergedOutputManager:
             available_space = self.max_chars_per_volume - self.current_char_count - header_len
             
             if len(remaining) > available_space:
-                c_chunk = remaining[:available_space]
-                remaining = remaining[available_space:]
+                # 行単位で分割：available_space以内で最後の改行位置を探す
+                split_pos = remaining.rfind('\n', 0, available_space)
+                
+                if split_pos == -1:
+                    # 改行が見つからない場合（非常に長い1行）
+                    # スペースで分割を試みる
+                    split_pos = remaining.rfind(' ', 0, available_space)
+                
+                if split_pos == -1:
+                    # スペースも見つからない場合は、そのまま分割（最終手段）
+                    split_pos = available_space
+                else:
+                    # 改行またはスペースの次の文字から新しいチャンクを開始
+                    split_pos += 1
+                
+                c_chunk = remaining[:split_pos]
+                remaining = remaining[split_pos:]
             else:
                 c_chunk = remaining
                 remaining = ""
