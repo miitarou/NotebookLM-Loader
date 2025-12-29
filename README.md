@@ -9,7 +9,7 @@ Microsoft Officeファイル（Word, Excel, PowerPoint）をはじめ、**多種
 ## 主な機能
 
 ### 1. Smart Chunking (自動分割結合)
-- フォルダ内の大量のファイルを、NotebookLMが読みやすいサイズ（約35MB）ごとに自動で結合・分割
+- フォルダ内の大量のファイルを、NotebookLMが読みやすいサイズ（約1000万文字）ごとに自動で結合・分割
 - `--merge` オプションで `converted_files_merged` フォルダに最適化されたファイルを生成
 
 ### 2. All-in-One Loader
