@@ -40,8 +40,8 @@ class Config:
     skip_ppt: bool = False
     
     # 拡張子設定
-    office_extensions_new: Set[str] = field(default_factory=lambda: {'.docx', '.xlsx', '.pptx'})
-    office_extensions_legacy: Set[str] = field(default_factory=lambda: {'.doc', '.xls', '.ppt'})
+    office_extensions_new: Set[str] = field(default_factory=lambda: {'.docx', '.xlsx', '.pptx', '.xls'})
+    office_extensions_legacy: Set[str] = field(default_factory=lambda: {'.doc', '.ppt'})
     markitdown_extensions: Set[str] = field(default_factory=lambda: {'.rtf', '.epub', '.msg', '.eml'})
     visio_extensions: Set[str] = field(default_factory=lambda: {'.vsdx', '.vsd'})
     image_extensions: Set[str] = field(default_factory=lambda: {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif', '.webp'})
