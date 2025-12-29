@@ -63,43 +63,60 @@ class MergedOutputManager:
         """
         巨大ファイルを行単位で分割して登録する
         
-        文字の途中で切断されないよう、改行位置で分割を行う。
-        これによりマルチバイト文字（日本語など）が途中で切れることを防ぐ。
+        行の途中で切断されないよう、行単位で処理を行う。
+        1行を追加するとサイズオーバーになる場合は、先にボリュームを閉じてから追加する。
+        これにより、行が途中で切れることを完全に防ぐ。
         """
         logger = get_logger()
-        remaining = content
+        lines = content.split('\n')
         part_num = 1
+        current_part_lines = []
+        current_part_size = 0
         
-        while remaining and part_num <= MAX_PARTS:
+        for line in lines:
+            line_with_newline = line + '\n'
+            line_len = len(line_with_newline)
+            
+            # Partヘッダーのサイズを計算
             part_header = f"\n\n# {filename} (Part {part_num})\n\n"
-            header_len = len(part_header)
+            header_len = len(part_header) if not current_part_lines else 0
             
-            if self.current_char_count + header_len > self.max_chars_per_volume:
-                 self._flush_volume()
+            # この行を追加した場合の合計サイズ
+            projected_total = self.current_char_count + header_len + current_part_size + line_len
             
-            available_space = max(1, self.max_chars_per_volume - self.current_char_count - header_len)
-            
-            if len(remaining) > available_space:
-                # 行単位で分割：available_space以内で最後の改行位置を探す
-                split_pos = remaining.rfind('\n', 0, available_space)
+            if projected_total > self.max_chars_per_volume and current_part_lines:
+                # 現在のPartを確定して追加
+                part_header = f"\n\n# {filename} (Part {part_num})\n\n"
+                full_chunk = part_header + ''.join(current_part_lines)
                 
-                if split_pos == -1:
-                    # 改行が見つからない場合、スペースで分割
-                    split_pos = remaining.rfind(' ', 0, available_space)
-                    if split_pos != -1:
-                        split_pos += 1
+                self.current_content.append(full_chunk)
+                self.file_index.append(f"{filename} (Part {part_num})")
+                self.current_char_count += len(full_chunk)
                 
-                if split_pos == -1 or split_pos == 0:
-                    # どれも見つからない場合は、そのまま分割（最終手段）
-                    split_pos = available_space
+                if self.current_char_count >= self.max_chars_per_volume:
+                    self._flush_volume()
                 
-                c_chunk = remaining[:split_pos]
-                remaining = remaining[split_pos:]
+                # 新しいPartを開始
+                part_num += 1
+                current_part_lines = [line_with_newline]
+                current_part_size = line_len
+                
+                if part_num > MAX_PARTS:
+                    logger.warning(f"Max parts ({MAX_PARTS}) reached for {filename}. File may be truncated.")
+                    break
             else:
-                c_chunk = remaining
-                remaining = ""
+                # 行を現在のPartに追加
+                current_part_lines.append(line_with_newline)
+                current_part_size += line_len
+        
+        # 残りの行を追加
+        if current_part_lines:
+            part_header = f"\n\n# {filename} (Part {part_num})\n\n"
             
-            full_chunk = part_header + c_chunk
+            if self.current_char_count + len(part_header) > self.max_chars_per_volume:
+                self._flush_volume()
+            
+            full_chunk = part_header + ''.join(current_part_lines)
             
             self.current_content.append(full_chunk)
             self.file_index.append(f"{filename} (Part {part_num})")
@@ -107,11 +124,6 @@ class MergedOutputManager:
             
             if self.current_char_count >= self.max_chars_per_volume:
                 self._flush_volume()
-            
-            part_num += 1
-        
-        if part_num > MAX_PARTS:
-            logger.warning(f"Max parts ({MAX_PARTS}) reached for {filename}. File may be truncated.")
 
     def _flush_volume(self):
         """現在のバッファをファイルに書き出す"""
