@@ -359,6 +359,8 @@ def _process_single_file(
 
     # Markdown出力
     if markdown_content:
+        # 全てのコンテンツから不可視文字を除去（MarkItDown変換後も含む）
+        markdown_content = sanitize_content(markdown_content)
         output_filename = get_output_filename(root_path, file_path, extension=".md")
         output_path = output_dir / output_filename
         
