@@ -453,7 +453,7 @@ def run() -> int:
         logger.info(f"Merged: {merged_dir}")
         logger.info("-" * 50)
         
-        merger = MergedOutputManager(merged_dir)
+        merger = MergedOutputManager(merged_dir, max_chars_per_volume=config.max_chars_per_volume)
     else:
         logger.info(f"Target: {target_path}")
         logger.info(f"Output: {output_dir}")

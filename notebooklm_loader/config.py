@@ -30,6 +30,7 @@ class Config:
     # ファイル処理設定
     max_file_size_mb: int = 100
     merge_volume_mb: int = 35
+    max_chars_per_volume: int = 7500000  # マージボリュームの最大文字数（デフォルト750万文字）
     visual_density_threshold: int = 300
     
     # CLI オプション
@@ -71,9 +72,10 @@ class Config:
         return self.max_file_size_mb * 1024 * 1024
     
     @property
-    def max_chars_per_volume(self) -> int:
-        """マージボリュームの最大文字数"""
-        return self.merge_volume_mb * 1024 * 1024 // 3  # 約3バイト/文字
+    def get_max_chars_per_volume(self) -> int:
+        """マージボリュームの最大文字数（設定値を優先）"""
+        # max_chars_per_volumeが明示的に設定されていればそれを使用
+        return self.max_chars_per_volume
     
     @classmethod
     def from_yaml(cls, path: Path) -> 'Config':
@@ -92,6 +94,8 @@ class Config:
                 config.merge_volume_mb = proc['merge_volume_mb']
             if 'visual_density_threshold' in proc:
                 config.visual_density_threshold = proc['visual_density_threshold']
+            if 'max_chars_per_volume' in proc:
+                config.max_chars_per_volume = proc['max_chars_per_volume']
         
         if 'skip_extensions' in data:
             config.skip_extensions = set(data['skip_extensions'])
