@@ -3,7 +3,7 @@
 [ [English](README_EN.md) | **日本語** | [中文](README_CN.md) ]
 
 
-Microsoft Officeファイル（Word, Excel, PowerPoint）をはじめ、**多種多様なファイル形式**をNotebookLMでの利用に最適化された形式に一括変換するPythonツールです。
+Microsoft Officeファイル（Word, Excel, PowerPoint）をはじめ、多種多様なファイル形式を、NotebookLMでの利用に最適な構造化された形式に一括変換するPythonツールです。
 **Microsoft公式の変換エンジン `MarkItDown`** を採用し、高い変換精度を実現しています。
 
 ## 主な機能
