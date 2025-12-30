@@ -7,7 +7,7 @@
 processing:
   max_file_size_mb: 100          # スキップする最大ファイルサイズ（MB）
   merge_volume_mb: 35            # 参考値（使用されない）
-  max_chars_per_volume: 7500000  # マージボリュームの最大文字数（推奨: 750万文字 ≒ 約7MB）
+  max_chars_per_volume: 5000000   # マージボリュームの最大文字数（推奨: 500万文字 ≒ 約5MB）
   visual_density_threshold: 300  # 画像1枚あたりの文字数がこの値未満で「画像多め」と判定しPDF変換
 
 # スキップ対象の拡張子

@@ -30,7 +30,7 @@ class Config:
     # ファイル処理設定
     max_file_size_mb: int = 100
     merge_volume_mb: int = 35
-    max_chars_per_volume: int = 7500000  # マージボリュームの最大文字数（デフォルト750万文字）
+    max_chars_per_volume: int = 5000000  # マージボリュームの最大文字数（デフォルト500万文字）
     visual_density_threshold: int = 300
     
     # CLI オプション
