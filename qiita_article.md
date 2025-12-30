@@ -36,7 +36,7 @@
 
 | 機能 | 説明 |
 |------|------|
-| 🧩 **Smart Chunking** | 大量ファイルを約1000万文字ごとに自動結合・分割 |
+| 🧩 **Smart Chunking** | 大量ファイルを約500万文字ごとに自動結合・分割 |
 | 📦 **All-in-One** | Office, PDF, CSV, 画像, 圧縮ファイルに対応 |
 | 🖼️ **Auto-PDF** | 図が多いPPTは自動でPDFに変換 |
 | 🇯🇵 **日本語対応** | Shift-JIS, EUC-JPも自動検出 |
@@ -95,7 +95,9 @@ python office_to_notebooklm.py /path/to/folder --merge
 
 ### 1️⃣ Smart Chunking（行単位分割）
 
-NotebookLMのファイルサイズ制限に対応するため、約1000万文字ごとにファイルを結合。
+NotebookLMのファイルサイズ制限に対応するため、約500万文字（約5MB）ごとにファイルを結合・分割。
+
+> ⚠️ **発見した制限**: NotebookLMには非公開のファイルサイズ制限があり、約5-10MBを超えるとアップロードエラーになることがあります。本ツールは安全マージンを取って500万文字で分割しています。
 
 **💡 工夫した点**: 単純な文字数分割だと日本語が途中で切れる問題があったので、**行単位**で分割するようにしました。
 
@@ -105,6 +107,12 @@ split_pos = remaining.rfind('\n', 0, available_space)
 ```
 
 さらに、CSVデータは**カンマ位置**、TSVは**タブ位置**で分割することで、レコードの途中で切れることを防いでいます。
+
+```yaml
+# config.yamlで調整可能
+processing:
+  max_chars_per_volume: 5000000  # 500万文字 ≒ 約5MB
+```
 
 ### 2️⃣ MarkItDown採用
 
