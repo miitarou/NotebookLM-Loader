@@ -110,22 +110,36 @@ def analyze_pptx(file_path) -> Tuple[int, int]:
         return 0, 0
 
 
-def convert_with_markitdown(file_path) -> Optional[str]:
+def convert_with_markitdown(file_path, max_retries: int = 3) -> Optional[str]:
     """
     MarkItDownを使用してファイルをMarkdownに変換
     
     Args:
         file_path: 対象ファイルのパス
+        max_retries: 最大リトライ回数（デフォルト: 3）
         
     Returns:
         変換後のMarkdown文字列、失敗時はNone
     """
-    try:
-        md = MarkItDown()
-        result = md.convert(str(file_path)) 
-        if result and result.text_content:
-            return result.text_content
-        return ""
-    except Exception as e:
-        print(f"    Error converting {file_path.name}: {e}")
-        return None
+    import time
+    logger = logging.getLogger("notebooklm_loader")
+    
+    last_error = None
+    for attempt in range(max_retries):
+        try:
+            md = MarkItDown()
+            result = md.convert(str(file_path)) 
+            if result and result.text_content:
+                return result.text_content
+            return ""
+        except Exception as e:
+            last_error = e
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # 指数バックオフ: 1, 2, 4秒
+                logger.debug(f"Retry {attempt + 1}/{max_retries} for {file_path.name} after {wait_time}s: {e}")
+                time.sleep(wait_time)
+            else:
+                logger.warning(f"    Error converting {file_path.name} after {max_retries} attempts: {e}")
+    
+    return None
+
