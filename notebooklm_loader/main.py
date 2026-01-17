@@ -7,6 +7,7 @@ import tempfile
 import logging
 from pathlib import Path
 from typing import List, Tuple, Optional, Set
+from tqdm import tqdm
 
 from .config import Config
 from .logger import setup_logging, get_logger
@@ -36,7 +37,8 @@ def process_directory(
     merger: Optional[MergedOutputManager],
     summary: ProcessingSummary,
     processed_archives: Optional[Set] = None,
-    password_protected_files: Optional[List] = None
+    password_protected_files: Optional[List] = None,
+    show_progress: bool = True
 ) -> List[str]:
     """
     ディレクトリを再帰的に処理する
@@ -86,23 +88,37 @@ def process_directory(
                     elif result == "OK":
                         process_directory(
                             Path(temp_dir), Path(temp_dir), output_dir, config,
-                            report_items, merger, summary, processed_archives, password_protected_files
+                            report_items, merger, summary, processed_archives, password_protected_files,
+                            show_progress=False  # アーカイブ内は進捗表示しない
                         )
             except Exception as e:
                 logger.error(f"Error processing archive {current_path}: {e}")
             return password_protected_files
 
-    # ディレクトリ処理
+    # ディレクトリ処理 - まずファイル一覧を収集
+    all_files = []
     for root, dirs, files in os.walk(current_path):
         if OUTPUT_DIR_NAME in root or "converted_files_merged" in root:
             continue
-            
         for file in files:
-            file_path = Path(root) / file
+            if not file.startswith('.'):
+                all_files.append((root, file))
+    
+    # プログレスバー付きでファイルを処理
+    file_iterator = all_files
+    if show_progress and all_files:
+        file_iterator = tqdm(all_files, desc="Processing files", unit="file", 
+                            leave=True, dynamic_ncols=True)
+    
+    for root, file in file_iterator:
+        file_path = Path(root) / file
+        
+        if show_progress and isinstance(file_iterator, tqdm):
+            file_iterator.set_postfix_str(file[:30] + '...' if len(file) > 30 else file)
             
-            # 隠しファイルをスキップ
-            if file.startswith('.'):
-                continue
+        # 隠しファイルをスキップ（既にフィルタ済みだが念のため）
+        if file.startswith('.'):
+            continue
             
             # シンボリックリンクをスキップ
             if file_path.is_symlink():
@@ -465,7 +481,8 @@ def run() -> int:
     
     password_protected_files = process_directory(
         target_path, root_processing_path, output_dir, config,
-        report_items, merger, summary, password_protected_files=password_protected_files
+        report_items, merger, summary, password_protected_files=password_protected_files,
+        show_progress=not config.quiet  # quietモード時はプログレスバー無効
     )
     
     # Finalize Merge
