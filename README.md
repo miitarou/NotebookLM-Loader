@@ -125,6 +125,41 @@ target_folder/
 - **Visual Density Report**: 各ファイルの処理結果（Markdown/PDF）
 - **Password Protected Files**: パスワード保護で処理できなかったファイル一覧
 
+## エラーリカバリー
+
+変換処理には自動リトライ機能が組み込まれています：
+
+| 処理 | リトライ回数 | バックオフ |
+|------|-------------|-----------|
+| MarkItDown変換 | 最大3回 | 指数バックオフ（1, 2, 4秒） |
+| LibreOffice PDF変換 | 最大3回 | 指数バックオフ（1, 2, 4秒） |
+
+一時的なエラー（ファイルロック、リソース不足等）が発生しても、自動的にリトライされます。
+
+## 開発者向け情報
+
+### テスト実行
+
+```bash
+# 仮想環境をアクティベート
+source venv/bin/activate
+
+# 全テスト実行
+python -m pytest tests/ -v
+
+# 特定のテストファイル
+python -m pytest tests/test_utils.py -v
+python -m pytest tests/test_merger.py -v
+```
+
+### テストカバレッジ
+
+| テストファイル | テスト数 | 対象 |
+|---------------|---------|------|
+| `test_utils.py` | 15件 | sanitize_content, sanitize_filename, get_output_filename |
+| `test_merger.py` | 11件 | MergedOutputManager, _handle_huge_file |
+
 ## ライセンス
 
 MIT License
+
